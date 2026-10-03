@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>html{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Myrimaven Prospect Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a working desk. Top bar with three views; Discover = catalog + AI panel side by side; a prospect opens as a two-column file (assessment left, contacts/next step right). */
+:root{
+  --bg:#EDF0EE; --surface:#FBFCFB; --sunk:#E3E8E5; --ink:#18212B; --muted:#56635F; --line:#D2DAD5;
+  --accent:#1D5B73; --accent-ink:#FFFFFF; --accent-soft:#D9E8EE;
+  --ok:#2C7348; --ok-soft:#DDEFE3; --warn:#9A5B08; --warn-soft:#F6E8CF; --bad:#9E3434; --bad-soft:#F5DEDC;
+  --violet:#5B4597; --violet-soft:#E6E0F4; --grey-soft:#E4E7E6;
+  --f-display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px; --shadow:0 1px 2px rgba(20,35,45,.06), 0 4px 16px rgba(20,35,45,.05);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10161B; --surface:#172028; --sunk:#1D2730; --ink:#E4EBE8; --muted:#97A5A1; --line:#2A3641;
+  --accent:#73B6CE; --accent-ink:#0B1A20; --accent-soft:#1B3440;
+  --ok:#72C48F; --ok-soft:#173326; --warn:#E3AA52; --warn-soft:#3A2B12; --bad:#EA8585; --bad-soft:#3D1D1D;
+  --violet:#B8A6EA; --violet-soft:#2B2442; --grey-soft:#252E35;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#10161B; --surface:#172028; --sunk:#1D2730; --ink:#E4EBE8; --muted:#97A5A1; --line:#2A3641;
+  --accent:#73B6CE; --accent-ink:#0B1A20; --accent-soft:#1B3440;
+  --ok:#72C48F; --ok-soft:#173326; --warn:#E3AA52; --warn-soft:#3A2B12; --bad:#EA8585; --bad-soft:#3D1D1D;
+  --violet:#B8A6EA; --violet-soft:#2B2442; --grey-soft:#252E35;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--ink); font:15px/1.55 var(--f-body); -webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-display); font-weight:700; text-wrap:balance; margin:0; letter-spacing:-.01em}
+h1{font-size:clamp(1.6rem,3.2vw,2.15rem); line-height:1.15}
+h2{font-size:1.25rem}
+h3{font-size:1.05rem; line-height:1.3}
+h4{font-family:var(--f-body); font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+p{margin:0}
+button,input,select,textarea{font:inherit; color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.mono{font-family:var(--f-mono); font-size:.85em; font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.eyebrow{font-family:var(--f-mono); font-size:.75rem; color:var(--accent); text-transform:uppercase; letter-spacing:.1em}
+
+/* top bar */
+.bar{position:sticky; top:env(safe-area-inset-top,0px); z-index:20; background:var(--surface); border-bottom:1px solid var(--line)}
+.bar-in{max-width:1200px; margin:0 auto; padding-inline:16px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding-block:10px}
+.brand{display:flex; align-items:baseline; gap:8px; margin-right:auto}
+.brand b{font-family:var(--f-display); font-size:1.15rem}
+.brand span{color:var(--muted); font-size:.85rem}
+.tabs{display:flex; gap:4px; background:var(--sunk); padding:3px; border-radius:999px}
+.tab{border:0; background:transparent; padding:6px 14px; border-radius:999px; cursor:pointer; font-weight:500; color:var(--muted); display:flex; gap:6px; align-items:center}
+.tab[aria-current="page"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow)}
+.tab .n{font-family:var(--f-mono); font-size:.75rem; background:var(--accent-soft); color:var(--accent); border-radius:999px; padding:0 7px}
+.store{font-size:.78rem; display:flex; align-items:center; gap:6px; color:var(--muted)}
+.store i{width:8px; height:8px; border-radius:50%; background:var(--muted); display:inline-block}
+.store.db i,.store.local i{background:var(--ok)} .store.memory i{background:var(--warn)}
+
+main{max-width:1200px; margin:0 auto; padding-inline:16px; padding-block:28px 64px; display:flex; flex-direction:column; gap:24px}
+
+/* buttons & fields */
+.btn{border:1px solid var(--line); background:var(--surface); border-radius:8px; padding:8px 14px; cursor:pointer; font-weight:500; display:inline-flex; gap:6px; align-items:center; justify-content:center}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent; background:transparent; color:var(--accent); padding-inline:6px}
+.btn.small{padding:4px 10px; font-size:.85rem}
+.btn.danger{color:var(--bad)}
+.btn[disabled]{opacity:.55; cursor:not-allowed}
+label.f{display:flex; flex-direction:column; gap:4px; font-size:.82rem; font-weight:500; color:var(--muted); min-width:0}
+input[type=text],input[type=search],input[type=date],input[type=email],select,textarea{width:100%; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; color:var(--ink); font-size:.95rem}
+textarea{resize:vertical; min-height:70px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent); outline:none; box-shadow:0 0 0 3px var(--accent-soft)}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end}
+.row > *{flex:1 1 160px}
+.row > .btn{flex:0 0 auto}
+
+/* panels */
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:20px; display:flex; flex-direction:column; gap:14px; min-width:0}
+.panel-head{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap}
+
+/* intro */
+.intro{display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:32px; align-items:end}
+.intro .lede{margin-top:10px; color:var(--muted); max-width:58ch}
+.steps{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; counter-reset:s}
+.steps li{counter-increment:s; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:.85rem; color:var(--muted); line-height:1.35}
+.steps li::before{content:counter(s); display:block; font-family:var(--f-mono); color:var(--accent); font-size:.75rem; margin-bottom:2px}
+.steps b{color:var(--ink); font-weight:600}
+
+/* discover */
+.discover{display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:24px; align-items:start}
+.filters{display:flex; flex-direction:column; gap:10px}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:4px 12px; font-size:.85rem; cursor:pointer; color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink); color:var(--surface); border-color:var(--ink)}
+.toggle{display:flex; gap:8px; align-items:center; font-size:.85rem; color:var(--muted); cursor:pointer}
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px}
+.org{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:16px; display:flex; flex-direction:column; gap:10px; min-width:0}
+.org .sub{font-size:.8rem; color:var(--muted)}
+.org p.sum{font-size:.9rem}
+.org .foot{margin-top:auto; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap}
+.tags{display:flex; flex-wrap:wrap; gap:5px}
+.tag{font-size:.75rem; padding:2px 8px; border-radius:4px; background:var(--accent-soft); color:var(--accent); font-weight:500}
+.flag{font-size:.8rem; color:var(--warn); background:var(--warn-soft); border-radius:6px; padding:6px 8px}
+.saved{font-size:.8rem; color:var(--ok); font-weight:600}
+.note{font-size:.8rem; color:var(--muted)}
+.ai .panel + .panel{margin-top:14px}
+.status-line{font-size:.85rem; color:var(--muted); display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.status-line.err{color:var(--bad)}
+.dots::after{content:"…"; animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.2}}
+.sugg{display:flex; flex-direction:column; gap:10px}
+.sugg-item{border-top:1px solid var(--line); padding-top:10px; display:flex; flex-direction:column; gap:6px}
+.sugg-item .verify{font-size:.8rem; color:var(--muted)}
+.unver{font-size:.7rem; font-family:var(--f-mono); color:var(--warn); text-transform:uppercase; letter-spacing:.06em}
+
+/* analysis */
+.analysis{display:flex; flex-direction:column; gap:16px}
+.ai-label{font-size:.8rem; color:var(--muted); background:var(--sunk); border-radius:6px; padding:8px 10px}
+.list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
+.problems li{border-left:3px solid var(--accent); padding-left:10px}
+.problems b{display:block}
+.problems span{font-size:.9rem; color:var(--muted)}
+.ev{display:flex; gap:10px; align-items:flex-start}
+.ev .txt{flex:1; min-width:0}
+.ev small{display:block; font-family:var(--f-mono); font-size:.72rem; color:var(--muted)}
+.ev small.verify{color:var(--warn)}
+.ev input[type=checkbox]{margin-top:4px; accent-color:var(--ok); width:16px; height:16px; flex:0 0 auto}
+.ev.done .txt{color:var(--muted); text-decoration:line-through}
+.ev.checked small::after{content:" · checked"; color:var(--ok)}
+.concerns li{font-size:.9rem; padding-left:14px; position:relative}
+.concerns li::before{content:"–"; position:absolute; left:0; color:var(--muted)}
+.inline-add{display:flex; gap:6px; flex-wrap:wrap}
+.inline-add input{flex:1 1 180px}
+
+/* sheet */
+.scrim{position:fixed; inset:0; background:rgba(10,18,24,.4); z-index:40}
+.sheet{position:fixed; top:0; right:0; bottom:0; width:min(560px,100%); background:var(--surface); z-index:41; overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 22px calc(env(safe-area-inset-bottom,0px) + 24px); display:flex; flex-direction:column; gap:18px; box-shadow:-8px 0 30px rgba(0,0,0,.15)}
+.sheet-head{display:flex; justify-content:space-between; gap:12px; align-items:flex-start}
+.sheet-actions{display:flex; gap:8px; flex-wrap:wrap; position:sticky; bottom:-24px; background:var(--surface); padding-block:12px; border-top:1px solid var(--line)}
+
+/* prospects list */
+.head-row{display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap}
+.banner{background:var(--warn-soft); color:var(--ink); border-radius:8px; padding:10px 14px; font-size:.88rem}
+.fu{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px}
+.fu-item{border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--bg); cursor:pointer; text-align:left; display:flex; flex-direction:column; gap:3px}
+.fu-item:hover{border-color:var(--accent)}
+.fu-item .when{font-family:var(--f-mono); font-size:.75rem; font-weight:500}
+.when.over{color:var(--bad)} .when.today{color:var(--warn)} .when.later{color:var(--muted)}
+.plist{display:flex; flex-direction:column; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); overflow:hidden}
+.prow{display:grid; grid-template-columns:minmax(0,2fr) 130px minmax(0,1.6fr) minmax(0,1.6fr) 90px; gap:16px; padding:14px 18px; border-top:1px solid var(--line); align-items:center; cursor:pointer; text-align:left; background:transparent; border-left:0; border-right:0; border-bottom:0; width:100%}
+.prow:first-child{border-top:0}
+.prow:hover{background:var(--bg)}
+.prow.hdr{cursor:default; background:var(--sunk); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; padding-block:8px}
+.prow.hdr:hover{background:var(--sunk)}
+.prow .nm b{display:block}
+.prow .nm span{font-size:.8rem; color:var(--muted)}
+.prow .cell{font-size:.88rem; min-width:0; overflow-wrap:anywhere}
+.pill{display:inline-block; font-size:.75rem; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap}
+.st-NeedsValidation{background:var(--warn-soft); color:var(--warn)}
+.st-PotentialFit{background:var(--ok-soft); color:var(--ok)}
+.st-Contacted{background:var(--accent-soft); color:var(--accent)}
+.st-FollowUp{background:var(--violet-soft); color:var(--violet)}
+.st-NotaFit{background:var(--grey-soft); color:var(--muted)}
+.ex{font-family:var(--f-mono); font-size:.68rem; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 5px; margin-left:6px; vertical-align:middle}
+.empty{text-align:center; padding:48px 20px; display:flex; flex-direction:column; gap:12px; align-items:center}
+.empty p{max-width:46ch; color:var(--muted)}
+
+/* profile */
+.back{align-self:flex-start}
+.phead{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:flex-end}
+.phead .meta{color:var(--muted); font-size:.9rem; margin-top:6px}
+.profile{display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:20px; align-items:start}
+.col{display:flex; flex-direction:column; gap:20px; min-width:0}
+.contact{border:1px solid var(--line); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:6px; background:var(--bg)}
+.contact .top{display:flex; justify-content:space-between; gap:8px; align-items:flex-start}
+.contact .info{font-size:.85rem; color:var(--muted); overflow-wrap:anywhere}
+.auth-Decisionmaker{color:var(--ok)} .auth-Influencer{color:var(--accent)} .auth-Nopurchasingauthority{color:var(--bad)} .auth-Unknown{color:var(--warn)}
+.contact select{width:auto; padding:3px 6px; font-size:.82rem}
+.log{list-style:none; margin:0; padding:0; display:flex; flex-direction:column}
+.log li{display:grid; grid-template-columns:76px minmax(0,1fr); gap:12px; padding-block:12px; border-top:1px solid var(--line)}
+.log li:first-child{border-top:0; padding-top:0}
+.log .d{font-family:var(--f-mono); font-size:.8rem; color:var(--muted)}
+.log .what{display:flex; flex-direction:column; gap:4px; min-width:0}
+.log .learned{font-size:.9rem; background:var(--sunk); border-radius:6px; padding:6px 10px}
+.oc{font-weight:600; font-size:.85rem}
+.oc-Interested,.oc-Meetingbooked{color:var(--ok)} .oc-Notinterested{color:var(--bad)} .oc-Noresponse{color:var(--muted)} .oc-Referredelsewhere{color:var(--accent)}
+details.form{border-top:1px dashed var(--line); padding-top:12px}
+details.form summary{cursor:pointer; color:var(--accent); font-weight:500; list-style:none}
+details.form summary::-webkit-details-marker{display:none}
+details.form summary::before{content:"+ "}
+details.form[open] summary::before{content:"– "}
+form.stack{display:flex; flex-direction:column; gap:10px; margin-top:10px}
+.confirm{display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:.88rem}
+
+/* learn */
+.stats{display:flex; flex-wrap:wrap; gap:8px}
+.stat{border:1px solid var(--line); border-radius:8px; background:var(--surface); padding:10px 14px; display:flex; gap:10px; align-items:baseline}
+.stat b{font-family:var(--f-mono); font-size:1.2rem}
+.learn{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start}
+.reason{display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:12px}
+.reason:first-of-type{border-top:0; padding-top:0}
+.reason .rh{display:flex; justify-content:space-between; gap:8px; font-weight:600}
+.reason ul{margin:0; padding-left:18px; font-size:.9rem; color:var(--muted)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse; width:100%; font-size:.88rem}
+th,td{text-align:left; padding:7px 8px; border-bottom:1px solid var(--line)}
+th{font-size:.72rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-weight:600}
+td.n{font-family:var(--f-mono); text-align:right} th.n{text-align:right}
+
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(env(safe-area-inset-bottom,0px) + 20px); background:var(--ink); color:var(--surface); padding:10px 16px; border-radius:8px; font-size:.9rem; z-index:60; max-width:calc(100% - 32px); box-shadow:var(--shadow)}
+
+@media (max-width:960px){
+  .discover,.profile,.learn,.intro{grid-template-columns:minmax(0,1fr)}
+  .prow{grid-template-columns:minmax(0,1fr) auto; gap:6px 12px}
+  .prow.hdr{display:none}
+  .prow .c-problem,.prow .c-next{grid-column:1 / -1}
+  .prow .c-fu{grid-column:2; grid-row:1; text-align:right}
+  .prow .c-status{grid-column:1 / -1}
+}
+@media (max-width:560px){
+  .steps{grid-template-columns:minmax(0,1fr)}
+  .brand span{display:none}
+  .tab{padding:6px 10px}
+}
+@media (prefers-reduced-motion:reduce){.dots::after{animation:none}}
+</style>
+</head>
+<body>
+
+
+<header class="bar"><div class="bar-in">
+  <div class="brand"><b>Myrimaven</b><span>Prospect Desk</span></div>
+  <nav class="tabs" id="nav" aria-label="Views"></nav>
+  <div class="store" id="store"><i></i><span>Connecting…</span></div>
+</div></header>
+<main id="main"></main>
+<div id="sheet-root"></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+/* ---------- reference data ---------- */
+const SIGNALS = {retention:"Employee retention", reskilling:"Reskilling", transitions:"Career transitions", pipeline:"Workforce pipeline"};
+const STATUSES = ["Needs Validation","Potential Fit","Contacted","Follow-Up","Not a Fit"];
+const AUTH = ["Decision-maker","Influencer","No purchasing authority","Unknown"];
+const CHANNELS = ["Email","LinkedIn","Phone","In person","Warm intro"];
+const OUTCOMES = ["No response","Interested","Meeting booked","Referred elsewhere","Not interested"];
+const REASONS = ["Doesn't see career exploration as relevant","No purchasing authority","Prefers an internal solution","Timing or budget","Wrong audience (not adults)","Other"];
+
+const CATALOG = [
+ {key:"northgate", name:"Northgate Polytechnic, Continuing Education", sector:"Post-secondary", size:"~4,000 adult learners a year", region:"Western Canada", signals:["transitions","reskilling"],
+  summary:"Continuing-education division serving mid-career adults who enroll to change or upgrade careers.",
+  analysis:{problems:[{title:"Career transitions",detail:"Adult learners often enroll without a clear target role, which can lead to program switching or non-completion."},{title:"Reskilling",detail:"New short credentials show demand from workers who need to retrain, but choosing the right credential is left to the learner."}],
+   evidence:[{text:"Launched four new micro-credential programs aimed at working adults this year.",source:"Program announcements (sample)"},{text:"Career-advising page lists two advisors for the whole continuing-education division.",source:"Website (sample)"},{text:"Program pages tell learners to explore their options first, but offer no tool for it.",source:"Website (sample)"}],
+   unknowns:["Does continuing education have its own budget for learner-support tools?","Who owns career advising for CE learners: the division or central career services?","Do they track non-completion, and is it a concern?"],
+   roles:["Director of Continuing Education","Manager, Learner Success","Career Services Manager"],
+   fitConcerns:["Post-secondary purchasing can be slow.","Career services may see this as overlapping with existing advising."]}},
+ {key:"prairiehealth", name:"Prairie Health Network", sector:"Healthcare employer", size:"~6,000 staff", region:"Western Canada", signals:["retention","pipeline"],
+  summary:"Regional health employer with ongoing turnover in nursing and allied-health roles.",
+  analysis:{problems:[{title:"Employee retention",detail:"First-year turnover in frontline roles is costly; staff who feel stuck leave for other employers."},{title:"Workforce pipeline",detail:"They need to steer existing staff toward hard-to-fill roles rather than only hiring externally."}],
+   evidence:[{text:"Posted a job for a \"Retention and Engagement Specialist\".",source:"Job posting (sample)"},{text:"Announced an internal mobility program for support staff moving into clinical roles.",source:"News release (sample)"},{text:"Local news coverage of nurse turnover in rural sites.",source:"News article (sample)"}],
+   unknowns:["Who owns the internal mobility program: HR, Learning & Development, or a clinical department?","Is there funding attached to the retention role?","Would a union need to be consulted?"],
+   roles:["VP People & Culture","Director, Learning & Development","Retention and Engagement Specialist (influencer)"],
+   fitConcerns:["Large employer: the first person reached may not have authority.","Health systems may prefer tools already in their HR platform."]}},
+ {key:"bowline", name:"Bowline Logistics", sector:"Transportation & warehousing", size:"~900 staff", region:"Prairies", signals:["reskilling","retention"],
+  summary:"Mid-size trucking and warehousing company automating parts of its warehouses.",
+  analysis:{problems:[{title:"Reskilling",detail:"Warehouse automation is changing roles; some workers need a path into maintenance, dispatch or supervision."},{title:"Employee retention",detail:"Workers who can't see a next step may leave during the transition."}],
+   evidence:[{text:"Opened an automated distribution centre this year.",source:"News release (sample)"},{text:"Careers page advertises \"grow with us\" but lists no development program.",source:"Website (sample)"}],
+   unknowns:["Is there an HR or training lead, or does the owner decide?","Are they building their own training ladder?"],
+   roles:["HR Manager","Operations Director","Owner / President"],
+   fitConcerns:["Smaller HR team may prefer hands-on training over an exploration tool."]}},
+ {key:"cedarvalley", name:"Cedar Valley Workforce Services", sector:"Non-profit employment services", size:"~60 staff, ~1,500 clients a year", region:"Western Canada", signals:["transitions","pipeline"],
+  summary:"Non-profit agency running government-funded programs for adults changing careers or returning to work.",
+  analysis:{problems:[{title:"Career transitions",detail:"Clients are adults between careers who need to work out what direction fits before choosing training."},{title:"Workforce pipeline",detail:"Funders measure job placement, so better early direction could improve outcomes."}],
+   evidence:[{text:"Runs a \"Career Decision-Making\" workshop series for adults.",source:"Program page (sample)"},{text:"Annual report highlights clients who changed direction mid-program.",source:"Annual report (sample)"}],
+   unknowns:["Do program budgets allow buying a tool, or does it need funder approval?","Would counsellors use it with clients or would clients use it alone?"],
+   roles:["Executive Director","Program Manager, Career Transitions","Employment Counsellor (influencer)"],
+   fitConcerns:["Funding cycles may limit when they can buy."]}},
+ {key:"helix", name:"Helix Energy Services", sector:"Energy services", size:"~2,400 staff", region:"Western Canada", signals:["transitions","reskilling"],
+  summary:"Oilfield services company restructuring as clients shift toward lower-carbon projects.",
+  analysis:{problems:[{title:"Career transitions",detail:"Restructuring means some staff must move into new kinds of work or leave the company."},{title:"Reskilling",detail:"New service lines need people with different skills than the current workforce."}],
+   evidence:[{text:"Announced a new division focused on carbon capture services.",source:"Investor update (sample)"},{text:"Reported workforce reductions in two field locations.",source:"News article (sample)"}],
+   unknowns:["Do they offer outplacement or redeployment support today?","Is HR centralized or regional?"],
+   roles:["VP Human Resources","Talent Development Lead","Outplacement / Transition Program Lead"],
+   fitConcerns:["Outplacement is often bought from established firms."]}},
+ {key:"summitcu", name:"Summit Credit Union", sector:"Financial services", size:"~700 staff", region:"Prairies", signals:["retention","transitions"],
+  summary:"Regional credit union consolidating branches and moving tellers into advisory and digital roles.",
+  analysis:{problems:[{title:"Employee retention",detail:"Branch consolidation can push experienced staff to leave if they don't see a future role."},{title:"Career transitions",detail:"Tellers are being asked to move into advisory or digital-support work that may not suit everyone."}],
+   evidence:[{text:"Posted a \"Career Pathing Lead\" role in HR.",source:"Job posting (sample)"},{text:"Closed three branches and opened a member contact centre.",source:"Member newsletter (sample)"}],
+   unknowns:["Has the Career Pathing Lead been hired, and what tools do they plan to use?","Is there a budget line for internal mobility?"],
+   roles:["Career Pathing Lead","Director of People","Chief Operating Officer"],
+   fitConcerns:["May already use a career-pathing feature in their HR software."]}},
+ {key:"ridgeline", name:"Ridgeline Staffing Group", sector:"Recruitment & staffing", size:"~120 staff", region:"Western Canada", signals:["pipeline"],
+  summary:"Staffing agency placing adults in light industrial and administrative roles.",
+  analysis:{problems:[{title:"Workforce pipeline",detail:"Placements that don't fit the candidate end early, which costs the agency and the client."}],
+   evidence:[{text:"Website promotes \"the right fit, the first time\" as a service promise.",source:"Website (sample)"}],
+   unknowns:["Would they pay for a fit tool, or expect candidates to use it for free?","Who decides on candidate-assessment tools?"],
+   roles:["Director of Operations","Recruitment Manager"],
+   fitConcerns:["Recruiters were a mixed fit in earlier conversations; buyer is unclear.","They may want a screening score, which Myrimaven does not offer."]}},
+ {key:"brightwater", name:"Brightwater School Division", sector:"K–12 education", size:"~30 schools", region:"Prairies", signals:["pipeline"], outside:true,
+  summary:"School division with a high-school career-education requirement.",
+  analysis:{problems:[{title:"Workforce pipeline",detail:"Students must complete career-education courses, but exploration tools are limited."}],
+   evidence:[{text:"Career and life management course is required for graduation.",source:"Curriculum page (sample)"}],
+   unknowns:["Would a division buy centrally, or does each school decide?"],
+   roles:["Career Education Coordinator","Assistant Superintendent, Learning"],
+   fitConcerns:["About 30 K–12 schools contacted earlier gave no response.","Myrimaven is currently focused on adults."]}}
+];
+
+/* ---------- state ---------- */
+const S = {view:"discover", openId:null, prospects:{}, mode:"loading", loaded:false, coll:null, unsub:null,
+  sample:null, aiOff:false, keep:{q:"", signal:"all", showOutside:false, statusFilter:"all"},
+  preview:null, suggest:{busy:false, ctl:null, err:"", items:[]}, analyze:{busy:false, ctl:null, err:""},
+  rerun:{busy:false, ctl:null, err:""}, confirmDel:null};
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const cls = v => String(v).replace(/[^A-Za-z]/g, "");
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const clone = o => JSON.parse(JSON.stringify(o));
+function todayISO(off = 0){ const d = new Date(); d.setDate(d.getDate() + off); const z = d.getTimezoneOffset() * 60000; return new Date(d - z).toISOString().slice(0, 10); }
+function fmtDate(iso){ if(!iso) return ""; const d = new Date(iso + "T00:00"); return isNaN(d) ? iso : d.toLocaleDateString("en-CA", {month:"short", day:"numeric"}); }
+function whenClass(iso){ const t = todayISO(); return iso < t ? "over" : iso === t ? "today" : "later"; }
+function whenText(iso){ const t = todayISO(); if(iso < t) return "Overdue · " + fmtDate(iso); if(iso === t) return "Today"; return fmtDate(iso); }
+let toastT; function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3800); }
+const list = () => Object.values(S.prospects).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+const isSaved = org => list().find(p => (org.key && p.catalogKey === org.key) || p.name.trim().toLowerCase() === org.name.trim().toLowerCase());
+
+/* ---------- routes ---------- */
+const ROUTE_TITLES = {discover:"Discover", prospects:"Prospects", learn:"Learnings"};
+function go(view, id){
+  const slug = view === "learn" ? "learnings" : view;
+  const h = view === "prospects" && id ? `#/prospects/${id}` : `#/${slug}`;
+  if(location.hash !== h) location.hash = h; else applyRoute();
+}
+function applyRoute(){
+  const parts = location.hash.replace(/^#\/?/, "").split("/");
+  const v = {discover:"discover", prospects:"prospects", learnings:"learn"}[parts[0]] || "discover";
+  S.view = v; S.openId = v === "prospects" && parts[1] ? parts[1] : null;
+  S.confirmDel = null; S.confirmClear = false; S.preview = null;
+  render(); window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", applyRoute);
+
+/* ---------- persistence ---------- */
+const LS_KEY = "myrimaven-prospects-v1";
+function lsLoad(){ try{ const r = localStorage.getItem(LS_KEY); return r ? JSON.parse(r) : {}; }catch(_){ return null; } }
+function lsSave(){ if(S.mode !== "local") return; try{ localStorage.setItem(LS_KEY, JSON.stringify(S.prospects)); }catch(_){ toast("Couldn't save in this browser. Changes last until you close the page."); } }
+const queues = {};
+function persist(p){
+  p.updatedAt = Date.now();
+  S.prospects[p.id] = p;
+  if(S.mode === "local") return lsSave();
+  if(S.mode !== "db") return;
+  const body = clone(p);
+  queues[p.id] = (queues[p.id] || Promise.resolve()).then(() => S.coll.doc(p.id).set(body)).catch(dbFail);
+}
+function removeProspect(id){
+  delete S.prospects[id];
+  if(S.mode === "local") return lsSave();
+  if(S.mode !== "db") return;
+  queues[id] = (queues[id] || Promise.resolve()).then(() => S.coll.doc(id).delete()).catch(dbFail);
+}
+function dbFail(err){
+  const c = err && err.code;
+  if(c === "unavailable"){ toast("Couldn't reach storage. Your last change may not be saved."); return; }
+  if(c === "quota_exceeded"){ toast("Storage is full. Remove a few prospects to save new ones."); return; }
+  if(S.mode !== "db") return;
+  S.mode = "memory"; if(S.unsub) S.unsub();
+  toast("This view can't save to your account. Changes now last for this visit only.");
+  render();
+}
+
+/* ---------- prospect creation ---------- */
+function newProspect(org, analysis, generatedBy){
+  const a = analysis || {problems:[], evidence:[], unknowns:[], roles:[], fitConcerns:[]};
+  return {id:uid(), name:org.name, sector:org.sector || "", size:org.size || "", region:org.region || "", website:org.website || "",
+    summary:org.summary || a.summary || "", signals:org.signals || [], catalogKey:org.key || "", example:false,
+    analysis:{problems:a.problems || [], evidence:(a.evidence || []).map(e => ({text:e.text, source:e.source, checked:false})),
+      unknowns:(a.unknowns || []).map(t => ({text:t, done:false})), roles:a.roles || [], fitConcerns:a.fitConcerns || [],
+      generatedBy:generatedBy || "none", generatedAt:todayISO()},
+    contacts:[], outreach:[], status:"Needs Validation", fitNote:"", nextAction:"", followUpDate:"", notes:"",
+    createdAt:Date.now(), updatedAt:Date.now()};
+}
+function loadExamples(){
+  const by = k => CATALOG.find(c => c.key === k);
+  const a = newProspect(by("northgate"), by("northgate").analysis, "sample");
+  a.example = true; a.status = "Follow-Up";
+  const c1 = {id:uid(), name:"Priya Sandhu", role:"Director of Continuing Education", email:"priya.sandhu@example.org", phone:"", authority:"Decision-maker", notes:"Met through a former colleague."};
+  a.contacts = [c1];
+  a.outreach = [{id:uid(), date:todayISO(-6), contactId:c1.id, channel:"Warm intro", outcome:"Interested", reason:"", learned:"Non-completion in two programs is her biggest worry. Budget for next year is set in April."}];
+  a.analysis.evidence[0].checked = true; a.analysis.unknowns[0].done = true;
+  a.nextAction = "Send a one-page pilot outline for one program"; a.followUpDate = todayISO(4);
+  const b = newProspect(by("prairiehealth"), by("prairiehealth").analysis, "sample");
+  b.example = true; b.status = "Contacted";
+  const c2 = {id:uid(), name:"Marcus Lee", role:"HR Generalist", email:"", phone:"", authority:"No purchasing authority", notes:"Friendly; offered an introduction."};
+  const c3 = {id:uid(), name:"(name not yet known)", role:"VP People & Culture", email:"", phone:"", authority:"Decision-maker", notes:"Owns retention initiatives."};
+  b.contacts = [c2, c3];
+  b.outreach = [{id:uid(), date:todayISO(-9), contactId:c2.id, channel:"Email", outcome:"Referred elsewhere", reason:"No purchasing authority", learned:"Retention projects sit with the VP People & Culture, not HR generalists."}];
+  b.nextAction = "Ask Marcus for the introduction to the VP"; b.followUpDate = todayISO(-1);
+  const c = newProspect(by("bowline"), by("bowline").analysis, "sample");
+  c.example = true; c.status = "Not a Fit";
+  const c4 = {id:uid(), name:"Dana Kowalski", role:"HR Manager", email:"", phone:"", authority:"Influencer", notes:""};
+  c.contacts = [c4];
+  c.outreach = [{id:uid(), date:todayISO(-14), contactId:c4.id, channel:"LinkedIn", outcome:"Not interested", reason:"Prefers an internal solution", learned:"They're building an in-house training ladder with their union and aren't looking at outside tools this year."}];
+  c.fitNote = "Building their own program. Smaller employers with hands-on training may not need an exploration tool.";
+  [a, b, c].forEach(p => { if(!isSaved(p)) persist(p); });
+  toast("Added three worked examples. They're marked Example.");
+  render();
+}
+
+/* ---------- AI ---------- */
+const CONTEXT = `Myrimaven is an early-stage company that offers a personality-based career exploration sandbox for adults. Joan, its founder, is looking for ORGANIZATIONS that might pay for it. A good prospect has a "career alignment problem": employee retention, reskilling needs, career transitions, or workforce pipeline problems. Myrimaven has no paying organizational customer yet, so the ideal customer is still being discovered. K–12 schools gave no response in earlier outreach, and career coaches are not a current target. Joan wants to understand WHY an organization might be a prospect, not a score.`;
+
+function aiErr(e){
+  const c = e && e.code;
+  if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(c)){ S.aiOff = true; return "AI isn't available in this view. You can still use the sample organizations and add prospects by hand."; }
+  if(c === "cancelled") return "";
+  if(c === "rate_limited") return "Too many AI requests right now. Wait a minute, then try again.";
+  if(c === "session_expired") return "Your session expired. Sign in again to use AI.";
+  if(c === "refused") return "Claude declined this request. Try rewording what you pasted.";
+  if(c === "prompt_too_large") return "That's too much text. Paste a shorter excerpt.";
+  if(c === "invalid_json" || c === "empty_completion") return "The answer came back in an unexpected shape. Try again.";
+  return "The AI request failed. Try again.";
+}
+const strArr = v => Array.isArray(v) ? v.map(x => typeof x === "string" ? x : (x && (x.text || x.title)) || "").filter(Boolean).slice(0, 8) : [];
+function normAnalysis(r){
+  r = r && typeof r === "object" ? r : {};
+  return {
+    summary:String(r.summary || ""), sector:String(r.sector || ""),
+    problems:(Array.isArray(r.problems) ? r.problems : []).map(p => typeof p === "string" ? {title:p, detail:""} : {title:String(p.title || ""), detail:String(p.detail || "")}).filter(p => p.title).slice(0, 5),
+    evidence:(Array.isArray(r.evidence) ? r.evidence : []).map(e => typeof e === "string" ? {text:e, source:"AI"} : {text:String(e.text || ""), source:String(e.source || "AI")}).filter(e => e.text).slice(0, 8),
+    unknowns:strArr(r.unknowns), roles:strArr(r.roles), fitConcerns:strArr(r.fitConcerns)
+  };
+}
+function analysisPrompt(name, website, notes){
+  return `${CONTEXT}
+
+Assess this organization for Joan.
+Organization: ${name}
+Website: ${website || "(not given)"}
+What Joan knows or has pasted (job postings, news, conversation notes; may be empty):
+"""
+${(notes || "").slice(0, 8000)}
+"""
+
+Rules:
+- Do not give a score and do not tell Joan whether to contact them. Give her the reasoning so she can decide.
+- Keep evidence honest. For each evidence item, set "source" to "Joan's notes" when it comes from the text above, or "General knowledge, verify" when it comes from your own background knowledge. Never invent specific numbers, dates, or quotes.
+- If you know little about this organization, say so in the summary and lean on unknowns.
+- Unknowns are questions Joan must answer before investing outreach time (budget, who decides, whether the problem is real).
+- Roles are job titles (not names) most likely to own the problem or the budget.
+
+Reply with only JSON in this shape:
+{"summary":"1-2 sentences","sector":"short sector label","problems":[{"title":"Employee retention | Reskilling | Career transitions | Workforce pipeline | other short label","detail":"one sentence"}],"evidence":[{"text":"one sentence","source":"Joan's notes | General knowledge, verify"}],"unknowns":["question"],"roles":["job title"],"fitConcerns":["reason it might not be a fit"]}`;
+}
+async function runAnalyze(name, website, notes, signals){
+  if(!S.sample || S.aiOff) return;
+  if(S.analyze.ctl) S.analyze.ctl.abort();
+  const ctl = new AbortController();
+  S.analyze = {busy:true, ctl, err:""}; paintAnalyzeStatus();
+  try{
+    const r = await S.sample.json(analysisPrompt(name, website, notes), {signal:ctl.signal});
+    const a = normAnalysis(r);
+    S.preview = {org:{name, website, sector:a.sector, summary:a.summary, signals:signals || guessSignals(a)}, analysis:a, by:"ai"};
+    S.analyze = {busy:false, ctl:null, err:""};
+    paintAnalyzeStatus(); renderSheet();
+  }catch(e){
+    S.analyze = {busy:false, ctl:null, err:aiErr(e)}; paintAnalyzeStatus();
+  }
+}
+function guessSignals(a){
+  const t = a.problems.map(p => p.title.toLowerCase()).join(" ");
+  const map = {retention:"retention", reskilling:"reskill", transitions:"transition", pipeline:"pipeline"};
+  return Object.keys(map).filter(k => t.includes(map[k]));
+}
+async function runSuggest(query, region){
+  if(!S.sample || S.aiOff) return;
+  if(S.suggest.ctl) S.suggest.ctl.abort();
+  const ctl = new AbortController();
+  S.suggest = {busy:true, ctl, err:"", items:[]}; paintSuggest();
+  const prompt = `${CONTEXT}
+
+Joan is looking for: ${query || "organizations with a career alignment problem"}
+Region: ${region || "any"}
+
+Suggest up to 6 candidates. Prefer adult-focused organizations. Avoid K–12 schools and career coaches unless Joan asks for them. Only name a specific organization if you are confident it exists; otherwise describe a type of organization (kind "type") she could search for. Never invent facts about a named organization; give reasons as things to check.
+
+Reply with only a JSON array:
+[{"name":"organization name or organization type","kind":"organization | type","sector":"short label","region":"where","signals":["retention | reskilling | transitions | pipeline"],"rationale":"one sentence on why it might have the problem","verify":"one concrete way Joan can check the signal"}]`;
+  try{
+    const r = await S.sample.json(prompt, {signal:ctl.signal});
+    const items = (Array.isArray(r) ? r : []).filter(x => x && x.name).slice(0, 6).map(x => ({
+      name:String(x.name), kind:x.kind === "type" ? "type" : "organization", sector:String(x.sector || ""), region:String(x.region || ""),
+      signals:strArr(x.signals).filter(s => SIGNALS[s]), rationale:String(x.rationale || ""), verify:String(x.verify || "")}));
+    S.suggest = {busy:false, ctl:null, err:items.length ? "" : "No suggestions came back. Try describing the organizations differently.", items};
+  }catch(e){ S.suggest = {busy:false, ctl:null, err:aiErr(e), items:[]}; }
+  paintSuggest();
+}
+async function rerunAnalysis(p){
+  if(!S.sample || S.aiOff) return;
+  const ctl = new AbortController();
+  S.rerun = {busy:true, ctl, err:""}; render();
+  const notes = [
+    p.summary && "Summary: " + p.summary,
+    p.analysis.evidence.length && "Evidence so far:\n" + p.analysis.evidence.map(e => `- ${e.text} (${e.source}${e.checked ? ", checked by Joan" : ""})`).join("\n"),
+    p.contacts.length && "Contacts:\n" + p.contacts.map(c => `- ${c.role} (${c.authority})`).join("\n"),
+    p.outreach.length && "Outreach so far:\n" + p.outreach.map(o => `- ${o.date} ${o.channel}: ${o.outcome}${o.reason ? " (" + o.reason + ")" : ""}. ${o.learned}`).join("\n"),
+    p.notes && "Joan's notes: " + p.notes
+  ].filter(Boolean).join("\n\n");
+  try{
+    const a = normAnalysis(await S.sample.json(analysisPrompt(p.name, p.website, notes), {signal:ctl.signal, cache:false}));
+    const fresh = S.prospects[p.id]; if(!fresh) return;
+    const keepEv = fresh.analysis.evidence.filter(e => e.checked || e.source === "Added by Joan");
+    const keepUn = fresh.analysis.unknowns.filter(u => u.done || u.mine);
+    const seen = new Set(keepEv.map(e => e.text.toLowerCase()));
+    fresh.analysis = {problems:a.problems, roles:a.roles, fitConcerns:a.fitConcerns, generatedBy:"ai", generatedAt:todayISO(),
+      evidence:keepEv.concat(a.evidence.filter(e => !seen.has(e.text.toLowerCase())).map(e => ({...e, checked:false}))),
+      unknowns:keepUn.concat(a.unknowns.filter(t => !keepUn.some(u => u.text.toLowerCase() === t.toLowerCase())).map(t => ({text:t, done:false})))};
+    if(a.summary && !fresh.summary) fresh.summary = a.summary;
+    persist(fresh);
+    S.rerun = {busy:false, ctl:null, err:""}; toast("Assessment updated. Your checked evidence and unknowns were kept.");
+  }catch(e){ S.rerun = {busy:false, ctl:null, err:aiErr(e)}; }
+  render();
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  const n = Object.keys(S.prospects).length;
+  $("#nav").innerHTML = [["discover","Discover"],["prospects","Prospects"],["learn","Learnings"]].map(([v, l]) =>
+    `<button class="tab" data-act="nav" data-view="${v}" ${S.view === v ? 'aria-current="page"' : ""}>${l}${v === "prospects" && n ? `<span class="n">${n}</span>` : ""}</button>`).join("");
+  const st = $("#store");
+  st.className = "store " + S.mode;
+  st.querySelector("span").textContent = S.mode === "db" ? "Saved to your account" : S.mode === "local" ? "Saved in this browser" : S.mode === "memory" ? "This visit only" : "Connecting…";
+  const op = S.openId && S.prospects[S.openId];
+  document.title = (op ? op.name + " · " : ROUTE_TITLES[S.view] + " · ") + "Myrimaven Prospect Desk";
+  const m = $("#main");
+  if(S.view === "discover") m.innerHTML = discoverHTML();
+  else if(S.view === "prospects") m.innerHTML = (S.openId && S.prospects[S.openId]) ? profileHTML(S.prospects[S.openId]) : listHTML();
+  else m.innerHTML = learnHTML();
+  renderSheet();
+}
+
+/* Discover */
+function discoverHTML(){
+  const outsideN = CATALOG.filter(c => c.outside).length;
+  return `
+  <section class="intro">
+    <div><p class="eyebrow">Discover</p><h1>Find organizations with a career alignment problem</h1>
+      <p class="lede">Start from a signal, read why an organization might need Myrimaven, then save the ones worth your outreach time.</p></div>
+    <ol class="steps"><li><b>Find</b> an organization showing a signal</li><li><b>Qualify</b> the problem and the right contact</li><li><b>Contact and learn</b>, even from a no</li></ol>
+  </section>
+  <div class="discover">
+    <div class="filters">
+      <div class="row">
+        <label class="f">Search sample organizations<input type="search" id="q" data-keep="q" value="${esc(S.keep.q)}" placeholder="Name, sector or region"></label>
+      </div>
+      <div class="chips" id="chips">${chipsHTML()}</div>
+      <label class="toggle"><input type="checkbox" id="showOutside" ${S.keep.showOutside ? "checked" : ""}> Show organizations outside the current focus (${outsideN})</label>
+      <p class="note">Sample organizations are fictional, for practice and demos. Use the AI tools to look at real ones.</p>
+      <div class="cards" id="cards">${cardsHTML()}</div>
+    </div>
+    <aside class="ai">${aiPanelHTML()}</aside>
+  </div>`;
+}
+function chipsHTML(){
+  return [["all","All signals"], ...Object.entries(SIGNALS)].map(([k, l]) =>
+    `<button class="chip" data-act="signal" data-k="${k}" aria-pressed="${S.keep.signal === k}">${l}</button>`).join("");
+}
+function cardsHTML(){
+  const q = S.keep.q.trim().toLowerCase();
+  const items = CATALOG.filter(c => (S.keep.showOutside || !c.outside)
+    && (S.keep.signal === "all" || c.signals.includes(S.keep.signal))
+    && (!q || [c.name, c.sector, c.region, c.summary].join(" ").toLowerCase().includes(q)));
+  if(!items.length) return `<p class="note">No sample organizations match. Clear the search or pick another signal.</p>`;
+  return items.map(c => `
+    <article class="org">
+      <div><h3>${esc(c.name)}</h3><p class="sub">${esc(c.sector)} · ${esc(c.size)} · ${esc(c.region)}</p></div>
+      <p class="sum">${esc(c.summary)}</p>
+      <div class="tags">${c.signals.map(s => `<span class="tag">${SIGNALS[s]}</span>`).join("")}</div>
+      ${c.outside ? `<p class="flag">Outside current focus: K–12 outreach got no responses and Myrimaven is focused on adults.</p>` : ""}
+      <div class="foot"><button class="btn small" data-act="preview" data-key="${c.key}">Why is this a prospect?</button>${isSaved(c) ? `<span class="saved">Saved</span>` : ""}</div>
+    </article>`).join("");
+}
+function aiPanelHTML(){
+  const off = !S.sample || S.aiOff;
+  const offNote = off ? `<p class="note">${S.mode === "loading" ? "Checking whether AI is available…" : "AI analysis isn't connected in this version yet. Use the sample organizations, or save an organization by hand."}</p>` : "";
+  return `
+  <div class="panel">
+    <div><h2>Suggest organizations</h2><p class="note">Describe who you're looking for. Suggestions are unverified until you check them.</p></div>
+    <label class="f">Looking for<textarea id="sq" data-keep="sq" rows="3" placeholder="e.g. Mid-size employers with high turnover in frontline roles">${esc(S.keep.sq || "")}</textarea></label>
+    <label class="f">Region<input type="text" id="sr" data-keep="sr" value="${esc(S.keep.sr || "")}" placeholder="e.g. Calgary and area"></label>
+    <div class="row"><button class="btn primary" data-act="suggest" ${off || S.suggest.busy ? "disabled" : ""}>Suggest organizations</button></div>
+    <div id="suggest-out">${suggestOutHTML()}</div>
+    ${offNote}
+  </div>
+  <div class="panel">
+    <div><h2>Analyze an organization</h2><p class="note">Get an assessment of why it might need Myrimaven, the evidence, and what's still unknown.</p></div>
+    <label class="f">Organization name<input type="text" id="an" data-keep="an" value="${esc(S.keep.an || "")}" placeholder="e.g. Mount Royal University, Continuing Education"></label>
+    <label class="f">Website (optional)<input type="text" id="aw" data-keep="aw" value="${esc(S.keep.aw || "")}" placeholder="example.org"></label>
+    <label class="f">What you know or have found<textarea id="ax" data-keep="ax" rows="4" placeholder="Paste a job posting, a news snippet, or notes from a conversation">${esc(S.keep.ax || "")}</textarea></label>
+    <div class="row"><button class="btn primary" data-act="analyze" ${off || S.analyze.busy ? "disabled" : ""}>Analyze</button><button class="btn" data-act="save-manual">Save without AI</button></div>
+    <div id="analyze-out">${analyzeOutHTML()}</div>
+  </div>`;
+}
+function suggestOutHTML(){
+  const s = S.suggest;
+  if(s.busy) return `<p class="status-line"><span class="dots">Thinking</span><button class="btn ghost small" data-act="stop" data-what="suggest">Stop</button></p>`;
+  let h = s.err ? `<p class="status-line err">${esc(s.err)}</p>` : "";
+  if(s.items.length) h += `<div class="sugg">${s.items.map((x, i) => `
+    <div class="sugg-item">
+      <span class="unver">${x.kind === "type" ? "Type of organization" : "Unverified suggestion"}</span>
+      <b>${esc(x.name)}</b><span class="note">${esc([x.sector, x.region].filter(Boolean).join(" · "))}</span>
+      ${x.signals.length ? `<div class="tags">${x.signals.map(k => `<span class="tag">${SIGNALS[k]}</span>`).join("")}</div>` : ""}
+      <span>${esc(x.rationale)}</span>
+      ${x.verify ? `<span class="verify">Check: ${esc(x.verify)}</span>` : ""}
+      <div><button class="btn small" data-act="analyze-sugg" data-i="${i}" ${x.kind === "type" ? "disabled title='Find a specific organization of this type first'" : ""}>Analyze this one</button></div>
+    </div>`).join("")}</div>`;
+  return h;
+}
+function analyzeOutHTML(){
+  const a = S.analyze;
+  if(a.busy) return `<p class="status-line"><span class="dots">Thinking</span><span>This can take up to a minute.</span><button class="btn ghost small" data-act="stop" data-what="analyze">Stop</button></p>`;
+  return a.err ? `<p class="status-line err">${esc(a.err)}</p>` : "";
+}
+function paintSuggest(){ const o = $("#suggest-out"); if(o) o.innerHTML = suggestOutHTML(); const b = document.querySelector('[data-act="suggest"]'); if(b) b.disabled = S.suggest.busy || !S.sample || S.aiOff; }
+function paintAnalyzeStatus(){ const o = $("#analyze-out"); if(o) o.innerHTML = analyzeOutHTML(); const b = document.querySelector('[data-act="analyze"]'); if(b) b.disabled = S.analyze.busy || !S.sample || S.aiOff; }
+
+/* Analysis block (read-only for preview, interactive in a profile) */
+function analysisHTML(a, by, p){
+  const label = by === "ai" ? "AI assessment. There is no score: use the evidence and unknowns to make your own call."
+    : by === "sample" ? "Prepared assessment for a sample organization."
+    : "No assessment yet. Add evidence and unknowns as you find them.";
+  const evid = (a.evidence || []).map((e, i) => {
+    const verify = /verify|general knowledge|^ai$/i.test(e.source || "");
+    return p ? `<li class="ev ${e.checked ? "checked" : ""}"><input type="checkbox" data-act="ev-check" data-i="${i}" ${e.checked ? "checked" : ""} aria-label="I checked this evidence"><div class="txt">${esc(e.text)}<small class="${verify && !e.checked ? "verify" : ""}">${esc(e.source)}</small></div></li>`
+      : `<li class="ev"><div class="txt">${esc(e.text)}<small class="${verify ? "verify" : ""}">${esc(e.source)}</small></div></li>`;
+  }).join("");
+  const unk = (a.unknowns || []).map((u, i) => {
+    const t = typeof u === "string" ? u : u.text;
+    return p ? `<li class="ev ${u.done ? "done" : ""}"><input type="checkbox" data-act="un-check" data-i="${i}" ${u.done ? "checked" : ""} aria-label="Answered"><div class="txt">${esc(t)}</div></li>`
+      : `<li class="ev"><div class="txt">${esc(t)}</div></li>`;
+  }).join("");
+  return `<div class="analysis">
+    <p class="ai-label">${label}</p>
+    ${a.summary ? `<p>${esc(a.summary)}</p>` : ""}
+    <div class="list-block"><h4>Potential problems</h4>${(a.problems || []).length ? `<ul class="list problems">${a.problems.map(x => `<li><b>${esc(x.title)}</b><span>${esc(x.detail)}</span></li>`).join("")}</ul>` : `<p class="note">None identified yet.</p>`}</div>
+    <div><h4>Supporting evidence${p ? " · tick what you've checked" : ""}</h4><ul class="list">${evid || `<li class="note">No evidence yet.</li>`}</ul>
+      ${p ? `<form class="inline-add" data-form="evidence" style="margin-top:8px"><input type="text" name="t" id="add-ev" placeholder="Add evidence you found" required><input type="text" name="s" id="add-ev-src" placeholder="Source (e.g. job posting)" style="flex:0 1 170px"><button class="btn small">Add</button></form>` : ""}</div>
+    <div><h4>Still to validate</h4><ul class="list">${unk || `<li class="note">Nothing listed.</li>`}</ul>
+      ${p ? `<form class="inline-add" data-form="unknown" style="margin-top:8px"><input type="text" name="t" id="add-un" placeholder="Add a question to answer" required><button class="btn small">Add</button></form>` : ""}</div>
+    ${(a.roles || []).length ? `<div><h4>Who might own the problem</h4><div class="tags" style="margin-top:6px">${a.roles.map(r => `<span class="tag">${esc(r)}</span>`).join("")}</div></div>` : ""}
+    ${(a.fitConcerns || []).length ? `<div><h4>Reasons it might not fit</h4><ul class="list concerns">${a.fitConcerns.map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>` : ""}
+  </div>`;
+}
+
+/* Preview sheet */
+function renderSheet(){
+  const root = $("#sheet-root");
+  const pv = S.preview;
+  if(!pv){ root.innerHTML = ""; return; }
+  const saved = isSaved(pv.org);
+  root.innerHTML = `<div class="scrim" data-act="close-sheet"></div>
+   <aside class="sheet" role="dialog" aria-modal="true" aria-label="${esc(pv.org.name)}">
+    <div class="sheet-head"><div><p class="eyebrow">Why might this organization need Myrimaven?</p><h2 style="margin-top:4px">${esc(pv.org.name)}</h2>
+      <p class="note" style="margin-top:4px">${esc([pv.org.sector, pv.org.size, pv.org.region].filter(Boolean).join(" · "))}</p></div>
+      <button class="btn ghost" data-act="close-sheet" aria-label="Close">Close</button></div>
+    ${pv.org.summary && pv.by !== "ai" ? `<p>${esc(pv.org.summary)}</p>` : ""}
+    ${analysisHTML(pv.analysis, pv.by)}
+    <div class="sheet-actions">
+      ${saved ? `<button class="btn primary" data-act="open" data-id="${saved.id}">Open saved prospect</button>`
+              : `<button class="btn primary" data-act="save-preview">Save as prospect</button>`}
+      <button class="btn" data-act="close-sheet">Not now</button>
+    </div>
+   </aside>`;
+  const btn = root.querySelector(".sheet .btn.primary"); if(btn) btn.focus({preventScroll:true});
+}
+
+/* Prospects list */
+function modeBanner(){
+  if(S.mode === "memory") return `<p class="banner">This view can't save to your account, so prospects last until you close the page.</p>`;
+  return "";
+}
+function listHTML(){
+  if(S.mode === "loading") return `<p class="muted">Loading your prospects…</p>`;
+  const all = list();
+  const head = `<section class="head-row"><div><p class="eyebrow">Prospects</p><h1>Your prospects</h1></div><div class="row" style="flex:0 0 auto">${all.length ? (S.confirmClear ? `<span class="confirm">Remove all prospects? <button class="btn small danger" data-act="clear-all">Remove all</button><button class="btn small" data-act="cancel-clear">Keep</button></span>` : `<button class="btn ghost small danger" data-act="ask-clear">Clear all</button>`) : ""}<button class="btn" data-act="nav" data-view="discover">Find more organizations</button></div></section>${modeBanner()}`;
+  if(!all.length) return head + `<div class="panel empty"><h2>No prospects yet</h2>
+    <p>Save an organization from Discover when it looks worth investigating. To see how a qualified prospect looks, load three worked examples.</p>
+    <div class="row" style="justify-content:center"><button class="btn primary" data-act="nav" data-view="discover">Go to Discover</button><button class="btn" data-act="examples">Load 3 examples</button></div></div>`;
+  const fus = all.filter(p => p.followUpDate && p.status !== "Not a Fit").sort((a, b) => a.followUpDate.localeCompare(b.followUpDate));
+  const fuHTML = `<section class="panel"><div class="panel-head"><h2>Follow-ups</h2><span class="note">${fus.length ? fus.length + " scheduled" : "Set a next step on a prospect to see it here"}</span></div>
+    ${fus.length ? `<div class="fu">${fus.map(p => `<button class="fu-item" data-act="open" data-id="${p.id}"><span class="when ${whenClass(p.followUpDate)}">${whenText(p.followUpDate)}</span><b>${esc(p.name)}</b><span class="note">${esc(p.nextAction || "No action written yet")}</span></button>`).join("")}</div>` : ""}</section>`;
+  const f = S.keep.statusFilter;
+  const counts = Object.fromEntries(STATUSES.map(s => [s, all.filter(p => p.status === s).length]));
+  const chips = `<div class="chips">${[["all", `All (${all.length})`], ...STATUSES.map(s => [s, `${s} (${counts[s]})`])].map(([k, l]) => `<button class="chip" data-act="status-filter" data-k="${esc(k)}" aria-pressed="${f === k}">${esc(l)}</button>`).join("")}</div>`;
+  const rows = all.filter(p => f === "all" || p.status === f);
+  const table = `<div class="plist">
+    <div class="prow hdr"><span>Organization</span><span>Status</span><span>Main problem</span><span>Next step</span><span>Follow-up</span></div>
+    ${rows.length ? rows.map(p => `<button class="prow" data-act="open" data-id="${p.id}">
+      <span class="nm"><b>${esc(p.name)}${p.example ? `<span class="ex">Example</span>` : ""}</b><span>${esc(p.sector || "Sector not set")} · ${p.contacts.length} contact${p.contacts.length === 1 ? "" : "s"}${p.contacts.some(c => c.authority === "Decision-maker") ? " · decision-maker found" : ""}</span></span>
+      <span class="c-status"><span class="pill st-${cls(p.status)}">${esc(p.status)}</span></span>
+      <span class="cell c-problem">${esc(p.analysis.problems[0] ? p.analysis.problems[0].title : "Not identified")}</span>
+      <span class="cell c-next muted">${esc(p.nextAction || "—")}</span>
+      <span class="cell c-fu">${p.followUpDate ? `<span class="when mono ${whenClass(p.followUpDate)}">${fmtDate(p.followUpDate)}</span>` : ""}</span>
+    </button>`).join("") : `<p class="note" style="padding:16px">No prospects with this status.</p>`}</div>`;
+  return head + fuHTML + chips + table;
+}
+
+/* Profile */
+function profileHTML(p){
+  const contactsOpts = p.contacts.map(c => `<option value="${c.id}">${esc(c.name)} · ${esc(c.role)}</option>`).join("");
+  const conName = id => { const c = p.contacts.find(x => x.id === id); return c ? `${c.name} (${c.role})` : "Contact not listed"; };
+  const aiOff = !S.sample || S.aiOff;
+  const delConfirm = S.confirmDel === p.id;
+  return `
+  <button class="btn ghost back" data-act="back">← All prospects</button>
+  ${modeBanner()}
+  <section class="phead">
+    <div><p class="eyebrow">Prospect${p.example ? " · Example" : ""}</p><h1 style="margin-top:4px">${esc(p.name)}</h1>
+      <p class="meta">${esc([p.sector, p.size, p.region].filter(Boolean).join(" · ") || "Add sector and size in Details")}${p.website ? ` · <span class="mono">${esc(p.website)}</span>` : ""}</p>
+      ${p.signals.length ? `<div class="tags" style="margin-top:8px">${p.signals.map(s => `<span class="tag">${SIGNALS[s] || esc(s)}</span>`).join("")}</div>` : ""}</div>
+    <span class="pill st-${cls(p.status)}">${esc(p.status)}</span>
+  </section>
+  <div class="profile">
+    <div class="col">
+      <section class="panel">
+        <div class="panel-head"><h2>Why is this a prospect?</h2>
+          <button class="btn small" data-act="rerun" ${aiOff || S.rerun.busy ? "disabled" : ""} title="${aiOff ? "AI isn't available in this view" : "Update the assessment using your evidence, contacts and outreach"}">${S.rerun.busy ? `<span class="dots">Updating</span>` : p.analysis.generatedBy === "none" ? "Assess with AI" : "Update with AI"}</button></div>
+        ${S.rerun.busy ? `<p class="status-line">This can take up to a minute. <button class="btn ghost small" data-act="stop" data-what="rerun">Stop</button></p>` : ""}
+        ${S.rerun.err ? `<p class="status-line err">${esc(S.rerun.err)}</p>` : ""}
+        ${p.summary ? `<p>${esc(p.summary)}</p>` : ""}
+        ${analysisHTML(p.analysis, p.analysis.generatedBy, p)}
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Outreach and what you learned</h2><span class="note">${p.outreach.length} logged</span></div>
+        ${p.outreach.length ? `<ul class="log">${p.outreach.slice().sort((a, b) => b.date.localeCompare(a.date)).map(o => `
+          <li><span class="d">${fmtDate(o.date)}</span><div class="what">
+            <div><span class="oc oc-${cls(o.outcome)}">${esc(o.outcome)}</span> <span class="note">· ${esc(o.channel)} · ${esc(conName(o.contactId))}</span></div>
+            ${o.reason ? `<span class="note">Reason: ${esc(o.reason)}</span>` : ""}
+            ${o.learned ? `<p class="learned">${esc(o.learned)}</p>` : ""}
+            <div><button class="btn ghost small danger" data-act="del-outreach" data-id="${o.id}">Remove entry</button></div>
+          </div></li>`).join("")}</ul>` : `<p class="note">No outreach yet. When you contact someone, log it here, including a no. A no tells you which organizations to skip next time.</p>`}
+        <details class="form" ${p.outreach.length ? "" : "open"}><summary>Log outreach</summary>
+          <form class="stack" data-form="outreach">
+            <div class="row">
+              <label class="f">Date<input type="date" name="date" id="o-date" value="${todayISO()}" required></label>
+              <label class="f">Contact<select name="contactId" id="o-contact"><option value="">Not listed</option>${contactsOpts}</select></label>
+            </div>
+            <div class="row">
+              <label class="f">Channel<select name="channel" id="o-channel">${CHANNELS.map(c => `<option>${c}</option>`).join("")}</select></label>
+              <label class="f">Response<select name="outcome" id="o-outcome">${OUTCOMES.map(c => `<option>${c}</option>`).join("")}</select></label>
+            </div>
+            <label class="f">If it wasn't a fit, why?<select name="reason" id="o-reason"><option value="">Not applicable</option>${REASONS.map(r => `<option>${r}</option>`).join("")}</select></label>
+            <label class="f">What did you learn?<textarea name="learned" id="o-learned" rows="2" placeholder="e.g. Retention budget sits with the VP, not HR"></textarea></label>
+            <div><button class="btn primary">Add to log</button></div>
+          </form>
+        </details>
+      </section>
+    </div>
+    <div class="col">
+      <section class="panel">
+        <h2>Status and next step</h2>
+        <label class="f">Status<select data-field="status" id="p-status">${STATUSES.map(s => `<option ${s === p.status ? "selected" : ""}>${s}</option>`).join("")}</select></label>
+        <label class="f">${p.status === "Not a Fit" ? "Why isn't it a fit?" : "Why this status?"}<textarea data-field="fitNote" id="p-fitnote" rows="2" placeholder="${p.status === "Not a Fit" ? "This feeds your Learnings" : "Optional"}">${esc(p.fitNote)}</textarea></label>
+        <label class="f">Next action<input type="text" data-field="nextAction" id="p-next" value="${esc(p.nextAction)}" placeholder="e.g. Ask for an intro to the VP People"></label>
+        <label class="f">Follow-up date<input type="date" data-field="followUpDate" id="p-fu" value="${esc(p.followUpDate)}"></label>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Contacts</h2><span class="note">${p.contacts.some(c => c.authority === "Decision-maker") ? "Decision-maker identified" : "No decision-maker yet"}</span></div>
+        ${p.contacts.map(c => `<div class="contact">
+          <div class="top"><div><b>${esc(c.name)}</b><div class="info">${esc(c.role)}</div></div>
+            <select data-contact="${c.id}" aria-label="Purchasing authority for ${esc(c.name)}" class="auth-${cls(c.authority)}">${AUTH.map(a => `<option ${a === c.authority ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+          ${c.email || c.phone ? `<div class="info mono">${esc([c.email, c.phone].filter(Boolean).join(" · "))}</div>` : ""}
+          ${c.notes ? `<div class="info">${esc(c.notes)}</div>` : ""}
+          <div><button class="btn ghost small danger" data-act="del-contact" data-id="${c.id}">Remove</button></div>
+        </div>`).join("") || `<p class="note">Who owns this problem or its budget? ${p.analysis.roles.length ? "Suggested roles: " + esc(p.analysis.roles.join(", ")) + "." : ""}</p>`}
+        <details class="form" ${p.contacts.length ? "" : "open"}><summary>Add a contact</summary>
+          <form class="stack" data-form="contact">
+            <div class="row"><label class="f">Name<input type="text" name="name" id="c-name" required placeholder="Name, or 'unknown'"></label>
+              <label class="f">Role<input type="text" name="role" id="c-role" required placeholder="e.g. Director of L&D"></label></div>
+            <div class="row"><label class="f">Email<input type="text" name="email" id="c-email"></label>
+              <label class="f">Phone<input type="text" name="phone" id="c-phone"></label></div>
+            <label class="f">Purchasing authority<select name="authority" id="c-auth">${AUTH.map(a => `<option ${a === "Unknown" ? "selected" : ""}>${a}</option>`).join("")}</select></label>
+            <label class="f">Notes<input type="text" name="notes" id="c-notes" placeholder="How you know them, what they care about"></label>
+            <div><button class="btn primary">Add contact</button></div>
+          </form>
+        </details>
+      </section>
+      <section class="panel">
+        <h2>Notes</h2>
+        <textarea data-field="notes" id="p-notes" rows="4" placeholder="Anything else worth remembering">${esc(p.notes)}</textarea>
+        <details class="form"><summary>Details</summary>
+          <div class="stack" style="margin-top:10px">
+            <label class="f">Sector<input type="text" data-field="sector" id="p-sector" value="${esc(p.sector)}"></label>
+            <label class="f">Size<input type="text" data-field="size" id="p-size" value="${esc(p.size)}"></label>
+            <label class="f">Region<input type="text" data-field="region" id="p-region" value="${esc(p.region)}"></label>
+            <label class="f">Website<input type="text" data-field="website" id="p-web" value="${esc(p.website)}"></label>
+          </div>
+        </details>
+        <div class="confirm">${delConfirm
+          ? `<span>Remove this prospect and its history?</span><button class="btn small danger" data-act="del-prospect">Remove</button><button class="btn small" data-act="cancel-del">Keep</button>`
+          : `<button class="btn ghost small danger" data-act="ask-del">Remove prospect</button>`}</div>
+      </section>
+    </div>
+  </div>`;
+}
+
+/* Learnings */
+function learnHTML(){
+  const all = list();
+  if(S.mode === "loading") return `<p class="muted">Loading…</p>`;
+  const head = `<section><p class="eyebrow">Learnings</p><h1>What outreach is teaching you</h1>
+    <p class="lede muted" style="margin-top:10px;max-width:60ch">Every response, including no response, is evidence about who Myrimaven's customer is. This page collects it.</p></section>`;
+  if(!all.length) return head + `<div class="panel empty"><h2>Nothing to learn from yet</h2><p>Log outreach on a prospect and the reasons and lessons collect here.</p><button class="btn" data-act="examples">Load 3 examples</button></div>`;
+  const stats = `<div class="stats">${STATUSES.map(s => `<div class="stat"><b>${all.filter(p => p.status === s).length}</b><span class="pill st-${cls(s)}">${s}</span></div>`).join("")}</div>`;
+  const entries = all.flatMap(p => p.outreach.map(o => ({...o, org:p.name, sector:p.sector})));
+  const reasons = {};
+  entries.filter(e => e.reason).forEach(e => (reasons[e.reason] = reasons[e.reason] || []).push(e));
+  all.filter(p => p.status === "Not a Fit" && p.fitNote).forEach(p => (reasons["Marked Not a Fit"] = reasons["Marked Not a Fit"] || []).push({org:p.name, sector:p.sector, learned:p.fitNote}));
+  const rHTML = Object.keys(reasons).length ? Object.entries(reasons).sort((a, b) => b[1].length - a[1].length).map(([r, es]) => `
+    <div class="reason"><div class="rh"><span>${esc(r)}</span><span class="mono">${es.length}</span></div>
+      <ul>${es.map(e => `<li><b>${esc(e.org)}</b>${e.sector ? ` (${esc(e.sector)})` : ""}${e.learned ? ": " + esc(e.learned) : ""}</li>`).join("")}</ul></div>`).join("")
+    : `<p class="note">When a contact says no, pick a reason in the outreach log. Patterns show up here.</p>`;
+  const sectors = {};
+  all.forEach(p => { const k = p.sector || "Sector not set"; const s = sectors[k] = sectors[k] || {n:0, contacted:0, positive:0, nofit:0};
+    s.n++; if(p.outreach.length) s.contacted++; if(p.outreach.some(o => ["Interested","Meeting booked"].includes(o.outcome))) s.positive++; if(p.status === "Not a Fit") s.nofit++; });
+  const sHTML = `<div class="tbl-wrap"><table><thead><tr><th>Sector</th><th class="n">Prospects</th><th class="n">Contacted</th><th class="n">Interested</th><th class="n">Not a fit</th></tr></thead><tbody>
+    ${Object.entries(sectors).sort((a, b) => b[1].n - a[1].n).map(([k, s]) => `<tr><td>${esc(k)}</td><td class="n">${s.n}</td><td class="n">${s.contacted}</td><td class="n">${s.positive}</td><td class="n">${s.nofit}</td></tr>`).join("")}</tbody></table></div>`;
+  const feed = entries.filter(e => e.learned).sort((a, b) => b.date.localeCompare(a.date));
+  const fHTML = feed.length ? `<ul class="log">${feed.map(e => `<li><span class="d">${fmtDate(e.date)}</span><div class="what"><div><b>${esc(e.org)}</b> <span class="oc oc-${cls(e.outcome)}">· ${esc(e.outcome)}</span></div><p class="learned">${esc(e.learned)}</p></div></li>`).join("")}</ul>`
+    : `<p class="note">Nothing written yet. Use "What did you learn?" when you log outreach.</p>`;
+  return head + stats + `<div class="learn">
+    <div class="col"><section class="panel"><h2>Why prospects weren't a fit</h2>${rHTML}</section>
+      <section class="panel"><h2>Responses by sector</h2>${sHTML}<p class="note">Counts only. With this few conversations, read them as hints, not trends.</p></section></div>
+    <section class="panel"><h2>Lessons, newest first</h2>${fHTML}</section></div>`;
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]"); if(!el) return;
+  const act = el.dataset.act;
+  const p = S.openId && S.prospects[S.openId];
+  switch(act){
+    case "nav": go(el.dataset.view); break;
+    case "ask-clear": S.confirmClear = true; render(); break;
+    case "cancel-clear": S.confirmClear = false; render(); break;
+    case "clear-all": Object.keys(S.prospects).forEach(removeProspect); S.confirmClear = false; render(); toast("All prospects removed."); break;
+    case "signal": S.keep.signal = el.dataset.k; $("#chips").innerHTML = chipsHTML(); $("#cards").innerHTML = cardsHTML(); break;
+    case "status-filter": S.keep.statusFilter = el.dataset.k; render(); break;
+    case "preview": { const c = CATALOG.find(x => x.key === el.dataset.key); S.preview = {org:c, analysis:c.analysis, by:"sample"}; renderSheet(); break; }
+    case "close-sheet": S.preview = null; renderSheet(); break;
+    case "save-preview": {
+      const pv = S.preview; const np = newProspect(pv.org, pv.analysis, pv.by);
+      persist(np); go("prospects", np.id);
+      toast("Saved. Check the evidence, add a contact, then set a status."); break; }
+    case "open": S.rerun.err = ""; go("prospects", el.dataset.id); break;
+    case "back": go("prospects"); break;
+    case "examples": loadExamples(); break;
+    case "suggest": runSuggest(S.keep.sq || "", S.keep.sr || ""); break;
+    case "analyze": {
+      const name = (S.keep.an || "").trim();
+      if(!name){ $("#an").focus(); S.analyze.err = "Enter an organization name first."; paintAnalyzeStatus(); return; }
+      runAnalyze(name, S.keep.aw || "", S.keep.ax || ""); break; }
+    case "analyze-sugg": {
+      const x = S.suggest.items[+el.dataset.i]; if(!x) return;
+      S.keep.an = x.name; S.keep.aw = ""; S.keep.ax = `Suggested because: ${x.rationale}\nHow to check: ${x.verify}\nSector: ${x.sector}. Region: ${x.region}.`;
+      ["an","aw","ax"].forEach(k => { const i = document.getElementById(k); if(i) i.value = S.keep[k]; });
+      runAnalyze(x.name, "", S.keep.ax, x.signals); break; }
+    case "save-manual": {
+      const name = (S.keep.an || "").trim();
+      if(!name){ $("#an").focus(); S.analyze.err = "Enter an organization name first."; paintAnalyzeStatus(); return; }
+      const ex = isSaved({name}); if(ex){ go("prospects", ex.id); return; }
+      const np = newProspect({name, website:S.keep.aw || ""}, null, "none");
+      if(S.keep.ax) np.notes = S.keep.ax;
+      persist(np); S.keep.an = S.keep.aw = S.keep.ax = ""; go("prospects", np.id); break; }
+    case "stop": { const w = S[el.dataset.what]; if(w && w.ctl) w.ctl.abort(); break; }
+    case "rerun": if(p) rerunAnalysis(p); break;
+    case "ev-check": if(p){ const ev = p.analysis.evidence[+el.dataset.i]; ev.checked = el.checked; persist(p); el.closest("li").classList.toggle("checked", el.checked); } break;
+    case "un-check": if(p){ const u = p.analysis.unknowns[+el.dataset.i]; u.done = el.checked; persist(p); el.closest("li").classList.toggle("done", el.checked); } break;
+    case "del-contact": if(p){ p.contacts = p.contacts.filter(c => c.id !== el.dataset.id); persist(p); render(); } break;
+    case "del-outreach": if(p){ p.outreach = p.outreach.filter(o => o.id !== el.dataset.id); persist(p); render(); } break;
+    case "ask-del": S.confirmDel = S.openId; render(); break;
+    case "cancel-del": S.confirmDel = null; render(); break;
+    case "del-prospect": if(p){ removeProspect(p.id); go("prospects"); toast("Prospect removed."); } break;
+  }
+});
+document.addEventListener("input", e => {
+  const k = e.target.dataset.keep; if(!k) return;
+  S.keep[k] = e.target.value;
+  if(k === "q") $("#cards").innerHTML = cardsHTML();
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if(t.id === "showOutside"){ S.keep.showOutside = t.checked; $("#cards").innerHTML = cardsHTML(); return; }
+  const p = S.openId && S.prospects[S.openId]; if(!p) return;
+  if(t.dataset.field){ p[t.dataset.field] = t.value; persist(p); if(["status"].includes(t.dataset.field)) render(); return; }
+  if(t.dataset.contact){ const c = p.contacts.find(x => x.id === t.dataset.contact); if(c){ c.authority = t.value; persist(p); render(); } }
+});
+document.addEventListener("submit", e => {
+  const f = e.target.closest("form[data-form]"); if(!f) return;
+  e.preventDefault();
+  const p = S.prospects[S.openId]; if(!p) return;
+  const d = Object.fromEntries(new FormData(f).entries());
+  const kind = f.dataset.form;
+  if(kind === "evidence"){ p.analysis.evidence.push({text:d.t.trim(), source:(d.s || "").trim() || "Added by Joan", checked:true}); if(d.s && d.s.trim()) p.analysis.evidence[p.analysis.evidence.length - 1].mine = true; }
+  if(kind === "unknown") p.analysis.unknowns.push({text:d.t.trim(), done:false, mine:true});
+  if(kind === "contact") p.contacts.push({id:uid(), name:d.name.trim(), role:d.role.trim(), email:d.email.trim(), phone:d.phone.trim(), authority:d.authority, notes:d.notes.trim()});
+  if(kind === "outreach"){
+    p.outreach.push({id:uid(), date:d.date, contactId:d.contactId, channel:d.channel, outcome:d.outcome, reason:d.reason, learned:d.learned.trim()});
+    if(p.outreach.length === 1 && ["Needs Validation","Potential Fit"].includes(p.status)){ p.status = "Contacted"; toast("Logged. Status set to Contacted."); }
+    else toast("Logged.");
+  }
+  persist(p); render();
+});
+document.addEventListener("keydown", e => { if(e.key === "Escape" && S.preview){ S.preview = null; renderSheet(); } });
+
+/* ---------- boot ---------- */
+const use = n => (window.claude && window.claude.use) ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
+applyRoute();
+(async () => {
+  const [db, user, sample] = await Promise.all([use("db"), use("user"), use("sample")]);
+  S.sample = sample;
+  const id = user ? await user.id().catch(() => null) : null;
+  if(db && id){
+    try{
+      S.coll = db.collection("data/users/" + id);
+      S.mode = "db";
+      let first = true;
+      S.unsub = S.coll.onSnapshot(snap => {
+        let changed = first; first = false;
+        for(const ch of snap.docChanges()){
+          const docId = ch.doc.id;
+          if(ch.type === "removed"){ if(S.prospects[docId]){ delete S.prospects[docId]; changed = true; } continue; }
+          const d = ch.doc.data(); const loc = S.prospects[docId];
+          if(d && (!loc || (d.updatedAt || 0) > (loc.updatedAt || 0))){ S.prospects[docId] = clone(d); changed = true; }
+        }
+        if(changed){ const a = document.activeElement; const typing = a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest("#main") && !first; if(!typing || S.view !== "prospects") render(); }
+      }, () => { S.mode = "memory"; render(); });
+    }catch(_){ S.mode = "memory"; }
+  } else {
+    const saved = lsLoad();
+    let ok = saved !== null;
+    if(ok){ try{ localStorage.setItem(LS_KEY + "-test", "1"); localStorage.removeItem(LS_KEY + "-test"); }catch(_){ ok = false; } }
+    if(ok){ S.mode = "local"; Object.assign(S.prospects, saved); } else S.mode = "memory";
+  }
+  render();
+})();
+</script>
+
+</body>
+</html>
