@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
 <style>
 /* Layout: a working desk. Top bar with three views; Discover = catalog + AI panel side by side; a prospect opens as a two-column file (assessment left, contacts/next step right). */
 :root{
@@ -60,7 +61,7 @@ a{color:var(--accent)}
 .tab .n{font-family:var(--f-mono); font-size:.75rem; background:var(--accent-soft); color:var(--accent); border-radius:999px; padding:0 7px}
 .store{font-size:.78rem; display:flex; align-items:center; gap:6px; color:var(--muted)}
 .store i{width:8px; height:8px; border-radius:50%; background:var(--muted); display:inline-block}
-.store.db i{background:var(--ok)} .store.memory i{background:var(--warn)}
+.store.db i,.store.local i{background:var(--ok)} .store.memory i{background:var(--warn)}
 
 main{max-width:1200px; margin:0 auto; padding-inline:16px; padding-block:28px 64px; display:flex; flex-direction:column; gap:24px}
 
@@ -230,11 +231,48 @@ td.n{font-family:var(--f-mono); text-align:right} th.n{text-align:right}
   .tab{padding:6px 10px}
 }
 @media (prefers-reduced-motion:reduce){.dots::after{animation:none}}
+
+/* fit rating */
+.fit{display:inline-flex; align-items:center; gap:6px; font-size:.75rem; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap}
+.fit::before{content:""; width:8px; height:8px; border-radius:50%; background:currentColor}
+.fit-Strong{background:var(--ok-soft); color:var(--ok)}
+.fit-Moderate{background:var(--warn-soft); color:var(--warn)}
+.fit-Weak{background:var(--grey-soft); color:var(--muted)}
+.fitline{display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:.82rem; color:var(--muted)}
+.crit{list-style:none; margin:0; padding:0; display:flex; flex-direction:column}
+.crit li{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; align-items:center; padding-block:8px; border-top:1px solid var(--line)}
+.crit li:first-child{border-top:0}
+.crit .cl{font-size:.9rem; font-weight:500}
+.crit .ch{font-size:.78rem; color:var(--muted); grid-column:1}
+.crit .why{font-size:.8rem; color:var(--muted); grid-column:1 / -1; background:var(--sunk); border-radius:6px; padding:4px 8px}
+.crit .deal{font-family:var(--f-mono); font-size:.65rem; color:var(--bad); text-transform:uppercase; letter-spacing:.06em; margin-left:6px}
+.seg{display:inline-flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; grid-row:1 / span 2; grid-column:2}
+.seg button{border:0; background:var(--surface); padding:4px 9px; font-size:.78rem; cursor:pointer; color:var(--muted); border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"].v-yes{background:var(--ok-soft); color:var(--ok); font-weight:600}
+.seg button[aria-pressed="true"].v-no{background:var(--bad-soft); color:var(--bad); font-weight:600}
+.seg button[aria-pressed="true"].v-unknown{background:var(--sunk); color:var(--ink); font-weight:600}
+.seg button[disabled]{cursor:default}
+.mark{font-family:var(--f-mono); font-size:.8rem; width:18px; display:inline-block; text-align:center}
+.mark.yes{color:var(--ok)} .mark.no{color:var(--bad)} .mark.unknown{color:var(--muted)}
+.mini-crit{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 12px; font-size:.85rem}
+.howrate{font-size:.85rem; color:var(--muted)}
+.howrate summary{cursor:pointer; color:var(--accent); font-weight:500}
+.howrate p{margin-top:6px; max-width:70ch}
+.postings{font-size:.85rem; display:flex; flex-direction:column; gap:6px}
+.postings ul{margin:0; padding-left:18px}
+.hire{font-family:var(--f-mono); font-size:.75rem; color:var(--muted)}
+.prow{grid-template-columns:minmax(0,2fr) 110px 130px minmax(0,1.4fr) minmax(0,1.4fr) 90px}
+.toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between}
+.toolbar select{width:auto}
+@media (max-width:960px){
+  .prow{grid-template-columns:minmax(0,1fr) auto}
+  .prow .c-fit{grid-column:1 / -1}
+}
+@media (max-width:560px){ .mini-crit{grid-template-columns:minmax(0,1fr)} }
 </style>
 </head>
 <body>
-
-
 <header class="bar"><div class="bar-in">
   <div class="brand"><b>Myrimaven</b><span>Prospect Desk</span></div>
   <nav class="tabs" id="nav" aria-label="Views"></nav>
@@ -244,103 +282,212 @@ td.n{font-family:var(--f-mono); text-align:right} th.n{text-align:right}
 <div id="sheet-root"></div>
 <div class="toast" id="toast" role="status" hidden></div>
 
+<script src="prompts.js"></script>
 <script>
 /* ---------- reference data ---------- */
 const SIGNALS = {retention:"Employee retention", reskilling:"Reskilling", transitions:"Career transitions", pipeline:"Workforce pipeline"};
 const STATUSES = ["Needs Validation","Potential Fit","Contacted","Follow-Up","Not a Fit"];
 const AUTH = ["Decision-maker","Influencer","No purchasing authority","Unknown"];
+const CONNECTIONS = ["Warm","Referral","Cold","Unknown"];
+const CONN_LABEL = {Warm:"Warm (you know them)", Referral:"Referral", Cold:"Cold", Unknown:"Unknown"};
 const CHANNELS = ["Email","LinkedIn","Phone","In person","Warm intro"];
 const OUTCOMES = ["No response","Interested","Meeting booked","Referred elsewhere","Not interested"];
-const REASONS = ["Doesn't see career exploration as relevant","No purchasing authority","Prefers an internal solution","Timing or budget","Wrong audience (not adults)","Other"];
+const REASONS = ["Bureaucracy, budget or long decision timeline","Doesn't use personality types in their process","Only uses in-house tools","No purchasing authority","Doesn't see career exploration as relevant","Wrong audience (not adults)","Timing","Other"];
+const REASON_FIT = {"Only uses in-house tools":"vendors", "Bureaucracy, budget or long decision timeline":"buying", "Wrong audience (not adults)":"adults"};
 
+/* Joan's fit criteria. A rating counts which are met; it is not a prediction. */
+const CRIT = [
+  {k:"adults",  label:"Serves adults",                         hint:"Not a K–12 school", deal:true},
+  {k:"problem", label:"Evidence of a career alignment problem", hint:"Retention, program switching, reskilling, transitions", deal:true},
+  {k:"size",    label:"Larger organization",                   hint:"Roughly 200+ staff or learners"},
+  {k:"hiring",  label:"Active hiring or workforce change",     hint:"Job postings, restructuring, new programs"},
+  {k:"decider", label:"Decision-maker reachable",              hint:"Someone who can approve a purchase", auto:"contacts"},
+  {k:"vendors", label:"Open to outside tools",                 hint:"Not in-house only", deal:true},
+  {k:"buying",  label:"Manageable buying process",             hint:"No heavy bureaucracy or long timelines"},
+  {k:"warm",    label:"Warm connection",                       hint:"You know someone there, or have a referral", auto:"contacts"}
+];
+const RANK = {Strong:0, Moderate:1, Weak:2};
+const decodeFit = code => Object.fromEntries(CRIT.map((c, i) => [c.k, ({y:"yes", n:"no"})[code && code[i]] || "unknown"]));
+function fitOf(p){
+  const v = Object.assign(decodeFit(""), p.fit || {});
+  const auto = {};
+  const cs = p.contacts || [];
+  if(cs.some(c => c.authority === "Decision-maker")){ v.decider = "yes"; auto.decider = true; }
+  if(cs.some(c => c.connection === "Warm" || c.connection === "Referral")){ v.warm = "yes"; auto.warm = true; }
+  const yes = CRIT.filter(c => v[c.k] === "yes"), no = CRIT.filter(c => v[c.k] === "no"), unk = CRIT.filter(c => v[c.k] === "unknown");
+  const deal = no.filter(c => c.deal);
+  const rating = deal.length ? "Weak" : yes.length >= 5 ? "Strong" : yes.length >= 3 ? "Moderate" : "Weak";
+  return {v, auto, yes, no, unk, deal, rating};
+}
+function fitSort(a, b){ const fa = fitOf(a), fb = fitOf(b); return RANK[fa.rating] - RANK[fb.rating] || fb.yes.length - fa.yes.length || fa.no.length - fb.no.length; }
+
+/* Sample organizations (fictional). fit = adults, problem, size, hiring, decider, vendors, buying, warm (y / n / ?) */
 const CATALOG = [
- {key:"northgate", name:"Northgate Polytechnic, Continuing Education", sector:"Post-secondary", size:"~4,000 adult learners a year", region:"Western Canada", signals:["transitions","reskilling"],
-  summary:"Continuing-education division serving mid-career adults who enroll to change or upgrade careers.",
-  analysis:{problems:[{title:"Career transitions",detail:"Adult learners often enroll without a clear target role, which can lead to program switching or non-completion."},{title:"Reskilling",detail:"New short credentials show demand from workers who need to retrain, but choosing the right credential is left to the learner."}],
-   evidence:[{text:"Launched four new micro-credential programs aimed at working adults this year.",source:"Program announcements (sample)"},{text:"Career-advising page lists two advisors for the whole continuing-education division.",source:"Website (sample)"},{text:"Program pages tell learners to explore their options first, but offer no tool for it.",source:"Website (sample)"}],
-   unknowns:["Does continuing education have its own budget for learner-support tools?","Who owns career advising for CE learners: the division or central career services?","Do they track non-completion, and is it a concern?"],
-   roles:["Director of Continuing Education","Manager, Learner Success","Career Services Manager"],
-   fitConcerns:["Post-secondary purchasing can be slow.","Career services may see this as overlapping with existing advising."]}},
- {key:"prairiehealth", name:"Prairie Health Network", sector:"Healthcare employer", size:"~6,000 staff", region:"Western Canada", signals:["retention","pipeline"],
+ {key:"kestrel", name:"Kestrel Aerostructures", sector:"Manufacturing", size:"~1,800 staff", region:"Western Canada", signals:["reskilling","pipeline"], fit:"yyyy?yy?", hiring:"~40 open roles, incl. 6 apprenticeships (sample)",
+  summary:"Aircraft-parts manufacturer automating its machining lines and running an apprenticeship program.",
+  analysis:{problems:[{title:"Reskilling",detail:"Automation is changing machinist roles; some staff need a path into programming, inspection or maintenance."},{title:"Workforce pipeline",detail:"Apprentices choose a trade early and some drop out when it doesn't suit them."}],
+   evidence:[{text:"Posted six apprenticeship openings and a \"Workforce Development Coordinator\" role.",source:"Job postings (sample)"},{text:"Announced a two-year automation upgrade of its main plant.",source:"News release (sample)"},{text:"Training budget is managed by a single L&D lead.",source:"LinkedIn (sample)"}],
+   unknowns:["Does the L&D lead have budget authority for new tools?","How many apprentices leave in their first year?"],
+   roles:["Workforce Development Coordinator","Manager, Learning & Development","VP Operations"],
+   fitConcerns:["Manufacturing staff may prefer hands-on assessments to an online sandbox."]}},
+ {key:"prairiehealth", name:"Prairie Health Network", sector:"Healthcare employer", size:"~6,000 staff", region:"Western Canada", signals:["retention","pipeline"], fit:"yyyy?y??", hiring:"~120 open roles (sample)",
   summary:"Regional health employer with ongoing turnover in nursing and allied-health roles.",
   analysis:{problems:[{title:"Employee retention",detail:"First-year turnover in frontline roles is costly; staff who feel stuck leave for other employers."},{title:"Workforce pipeline",detail:"They need to steer existing staff toward hard-to-fill roles rather than only hiring externally."}],
    evidence:[{text:"Posted a job for a \"Retention and Engagement Specialist\".",source:"Job posting (sample)"},{text:"Announced an internal mobility program for support staff moving into clinical roles.",source:"News release (sample)"},{text:"Local news coverage of nurse turnover in rural sites.",source:"News article (sample)"}],
    unknowns:["Who owns the internal mobility program: HR, Learning & Development, or a clinical department?","Is there funding attached to the retention role?","Would a union need to be consulted?"],
    roles:["VP People & Culture","Director, Learning & Development","Retention and Engagement Specialist (influencer)"],
    fitConcerns:["Large employer: the first person reached may not have authority.","Health systems may prefer tools already in their HR platform."]}},
- {key:"bowline", name:"Bowline Logistics", sector:"Transportation & warehousing", size:"~900 staff", region:"Prairies", signals:["reskilling","retention"],
-  summary:"Mid-size trucking and warehousing company automating parts of its warehouses.",
-  analysis:{problems:[{title:"Reskilling",detail:"Warehouse automation is changing roles; some workers need a path into maintenance, dispatch or supervision."},{title:"Employee retention",detail:"Workers who can't see a next step may leave during the transition."}],
-   evidence:[{text:"Opened an automated distribution centre this year.",source:"News release (sample)"},{text:"Careers page advertises \"grow with us\" but lists no development program.",source:"Website (sample)"}],
-   unknowns:["Is there an HR or training lead, or does the owner decide?","Are they building their own training ladder?"],
-   roles:["HR Manager","Operations Director","Owner / President"],
-   fitConcerns:["Smaller HR team may prefer hands-on training over an exploration tool."]}},
- {key:"cedarvalley", name:"Cedar Valley Workforce Services", sector:"Non-profit employment services", size:"~60 staff, ~1,500 clients a year", region:"Western Canada", signals:["transitions","pipeline"],
-  summary:"Non-profit agency running government-funded programs for adults changing careers or returning to work.",
-  analysis:{problems:[{title:"Career transitions",detail:"Clients are adults between careers who need to work out what direction fits before choosing training."},{title:"Workforce pipeline",detail:"Funders measure job placement, so better early direction could improve outcomes."}],
-   evidence:[{text:"Runs a \"Career Decision-Making\" workshop series for adults.",source:"Program page (sample)"},{text:"Annual report highlights clients who changed direction mid-program.",source:"Annual report (sample)"}],
-   unknowns:["Do program budgets allow buying a tool, or does it need funder approval?","Would counsellors use it with clients or would clients use it alone?"],
-   roles:["Executive Director","Program Manager, Career Transitions","Employment Counsellor (influencer)"],
-   fitConcerns:["Funding cycles may limit when they can buy."]}},
- {key:"helix", name:"Helix Energy Services", sector:"Energy services", size:"~2,400 staff", region:"Western Canada", signals:["transitions","reskilling"],
-  summary:"Oilfield services company restructuring as clients shift toward lower-carbon projects.",
-  analysis:{problems:[{title:"Career transitions",detail:"Restructuring means some staff must move into new kinds of work or leave the company."},{title:"Reskilling",detail:"New service lines need people with different skills than the current workforce."}],
-   evidence:[{text:"Announced a new division focused on carbon capture services.",source:"Investor update (sample)"},{text:"Reported workforce reductions in two field locations.",source:"News article (sample)"}],
-   unknowns:["Do they offer outplacement or redeployment support today?","Is HR centralized or regional?"],
-   roles:["VP Human Resources","Talent Development Lead","Outplacement / Transition Program Lead"],
-   fitConcerns:["Outplacement is often bought from established firms."]}},
- {key:"summitcu", name:"Summit Credit Union", sector:"Financial services", size:"~700 staff", region:"Prairies", signals:["retention","transitions"],
+ {key:"fieldstone", name:"Fieldstone Home Care", sector:"Home and community care", size:"~350 caregivers", region:"Prairies", signals:["retention","transitions"], fit:"yyyy?y??", hiring:"~25 open roles (sample)",
+  summary:"Home-care provider that loses many new caregivers within their first year.",
+  analysis:{problems:[{title:"Employee retention",detail:"Caregivers often take the job as a stopgap and leave when they find a better-fitting path."},{title:"Career transitions",detail:"Many hires are career changers who haven't explored whether care work suits them."}],
+   evidence:[{text:"Careers page says \"no experience needed\" and recruits career changers.",source:"Website (sample)"},{text:"Posts the same caregiver openings every month.",source:"Job postings (sample)"}],
+   unknowns:["What is their actual first-year turnover?","Does the owner or an HR manager decide on tools?"],
+   roles:["Director of Operations","HR Manager"],
+   fitConcerns:["Thin margins may limit budget."]}},
+ {key:"summitcu", name:"Summit Credit Union", sector:"Financial services", size:"~700 staff", region:"Prairies", signals:["retention","transitions"], fit:"yyyy?y??", hiring:"~15 open roles (sample)",
   summary:"Regional credit union consolidating branches and moving tellers into advisory and digital roles.",
   analysis:{problems:[{title:"Employee retention",detail:"Branch consolidation can push experienced staff to leave if they don't see a future role."},{title:"Career transitions",detail:"Tellers are being asked to move into advisory or digital-support work that may not suit everyone."}],
    evidence:[{text:"Posted a \"Career Pathing Lead\" role in HR.",source:"Job posting (sample)"},{text:"Closed three branches and opened a member contact centre.",source:"Member newsletter (sample)"}],
    unknowns:["Has the Career Pathing Lead been hired, and what tools do they plan to use?","Is there a budget line for internal mobility?"],
    roles:["Career Pathing Lead","Director of People","Chief Operating Officer"],
    fitConcerns:["May already use a career-pathing feature in their HR software."]}},
- {key:"ridgeline", name:"Ridgeline Staffing Group", sector:"Recruitment & staffing", size:"~120 staff", region:"Western Canada", signals:["pipeline"],
+ {key:"northgate", name:"Northgate Polytechnic, Continuing Education", sector:"Post-secondary", size:"~4,000 adult learners a year", region:"Western Canada", signals:["transitions","reskilling"], fit:"yyy??yn?", hiring:"Few postings; growth is in new programs",
+  summary:"Continuing-education division serving mid-career adults who enroll to change or upgrade careers.",
+  analysis:{problems:[{title:"Career transitions",detail:"Adult learners often enroll without a clear target role, which can lead to program switching or non-completion."},{title:"Reskilling",detail:"New short credentials show demand from workers who need to retrain, but choosing the right credential is left to the learner."}],
+   evidence:[{text:"Launched four new micro-credential programs aimed at working adults this year.",source:"Program announcements (sample)"},{text:"Career-advising page lists two advisors for the whole continuing-education division.",source:"Website (sample)"},{text:"Program pages tell learners to explore their options first, but offer no tool for it.",source:"Website (sample)"}],
+   unknowns:["Does continuing education have its own budget for learner-support tools?","Who owns career advising for CE learners: the division or central career services?","Do they track non-completion, and is it a concern?"],
+   roles:["Director of Continuing Education","Manager, Learner Success","Career Services Manager"],
+   fitConcerns:["Post-secondary buying is slow: a stakeholder already cited bureaucracy, budget and long timelines.","Career services may see this as overlapping with existing advising."]}},
+ {key:"westbrook", name:"Westbrook College", sector:"Post-secondary", size:"~9,000 students", region:"Western Canada", signals:["transitions","pipeline"], fit:"yyy??yn?", hiring:"~10 open roles (sample)",
+  summary:"College where many first-year students switch out of health and business programs.",
+  analysis:{problems:[{title:"Career transitions",detail:"Students switching programs cost tuition and time, and lower completion rates."},{title:"Workforce pipeline",detail:"Health programs lose students who might have stayed with better early exploration."}],
+   evidence:[{text:"Annual report lists program-transfer rates as a focus for next year.",source:"Annual report (sample)"},{text:"Runs a first-year \"Explore\" seminar with no assessment tool.",source:"Website (sample)"}],
+   unknowns:["Which office owns retention: student services or the academic deans?","How long does a new tool take to approve?"],
+   roles:["Director, Student Success","Dean of Health","Career Centre Manager"],
+   fitConcerns:["Same buying-process risk as other post-secondary institutions."]}},
+ {key:"cedarvalley", name:"Cedar Valley Workforce Services", sector:"Non-profit employment services", size:"~60 staff, ~1,500 clients a year", region:"Western Canada", signals:["transitions","pipeline"], fit:"yyn??yy?", hiring:"Few postings",
+  summary:"Non-profit agency running government-funded programs for adults changing careers or returning to work.",
+  analysis:{problems:[{title:"Career transitions",detail:"Clients are adults between careers who need to work out what direction fits before choosing training."},{title:"Workforce pipeline",detail:"Funders measure job placement, so better early direction could improve outcomes."}],
+   evidence:[{text:"Runs a \"Career Decision-Making\" workshop series for adults.",source:"Program page (sample)"},{text:"Annual report highlights clients who changed direction mid-program.",source:"Annual report (sample)"}],
+   unknowns:["Do program budgets allow buying a tool, or does it need funder approval?","Would counsellors use it with clients or would clients use it alone?"],
+   roles:["Executive Director","Program Manager, Career Transitions","Employment Counsellor (influencer)"],
+   fitConcerns:["Small organization, though it serves many adults.","Funding cycles may limit when they can buy."]}},
+ {key:"aspenridge", name:"Aspen Ridge Hotels", sector:"Hospitality", size:"~1,100 staff", region:"Rocky Mountains", signals:["retention"], fit:"yyyy????", hiring:"~70 seasonal roles (sample)",
+  summary:"Resort hotel group with high seasonal turnover among young adult staff.",
+  analysis:{problems:[{title:"Employee retention",detail:"Seasonal staff rarely return, so the group re-hires and re-trains every year."}],
+   evidence:[{text:"Advertises a \"grow your career with us\" program but few staff move into year-round roles.",source:"Website (sample)"},{text:"Posts around 70 seasonal roles each spring.",source:"Job postings (sample)"}],
+   unknowns:["Is turnover seen as a problem or just a cost of seasonal work?","Who owns staff development: HR or each property?"],
+   roles:["Director of Human Resources","Talent Development Manager"],
+   fitConcerns:["They may accept turnover as normal for the industry."]}},
+ {key:"helix", name:"Helix Energy Services", sector:"Energy services", size:"~2,400 staff", region:"Western Canada", signals:["transitions","reskilling"], fit:"yyyy??n?", hiring:"Hiring in one division, cutting in two",
+  summary:"Oilfield services company restructuring as clients shift toward lower-carbon projects.",
+  analysis:{problems:[{title:"Career transitions",detail:"Restructuring means some staff must move into new kinds of work or leave the company."},{title:"Reskilling",detail:"New service lines need people with different skills than the current workforce."}],
+   evidence:[{text:"Announced a new division focused on carbon capture services.",source:"Investor update (sample)"},{text:"Reported workforce reductions in two field locations.",source:"News article (sample)"}],
+   unknowns:["Do they offer outplacement or redeployment support today?","Is HR centralized or regional?"],
+   roles:["VP Human Resources","Talent Development Lead","Outplacement / Transition Program Lead"],
+   fitConcerns:["Outplacement is often bought from established firms through long procurement."]}},
+ {key:"bowline", name:"Bowline Logistics", sector:"Transportation & warehousing", size:"~900 staff", region:"Prairies", signals:["reskilling","retention"], fit:"yyyy????", hiring:"~30 open roles (sample)",
+  summary:"Mid-size trucking and warehousing company automating parts of its warehouses.",
+  analysis:{problems:[{title:"Reskilling",detail:"Warehouse automation is changing roles; some workers need a path into maintenance, dispatch or supervision."},{title:"Employee retention",detail:"Workers who can't see a next step may leave during the transition."}],
+   evidence:[{text:"Opened an automated distribution centre this year.",source:"News release (sample)"},{text:"Careers page advertises \"grow with us\" but lists no development program.",source:"Website (sample)"}],
+   unknowns:["Is there an HR or training lead, or does the owner decide?","Are they building their own training ladder?"],
+   roles:["HR Manager","Operations Director","Owner / President"],
+   fitConcerns:["May build training in-house with their union."]}},
+ {key:"ironwood", name:"Ironwood Mining", sector:"Mining", size:"~3,000 staff", region:"Northern Canada", signals:["reskilling","pipeline"], fit:"yyyy?n??", hiring:"~90 open roles (sample)",
+  summary:"Large mining operator with a strong internal training academy.",
+  analysis:{problems:[{title:"Workforce pipeline",detail:"Remote sites struggle to fill skilled trades roles."}],
+   evidence:[{text:"Runs its own training academy and builds its programs internally.",source:"Website (sample)"},{text:"Careers site lists about 90 openings across sites.",source:"Job postings (sample)"}],
+   unknowns:["Would the academy ever license an outside tool?"],
+   roles:["Director, Training Academy"],
+   fitConcerns:["Builds everything in-house, like an earlier contact who only used internal tools."]}},
+ {key:"ridgeline", name:"Ridgeline Staffing Group", sector:"Recruitment & staffing", size:"~120 staff", region:"Western Canada", signals:["pipeline"], fit:"y?n??y??", hiring:"Recruits for clients, not itself",
   summary:"Staffing agency placing adults in light industrial and administrative roles.",
   analysis:{problems:[{title:"Workforce pipeline",detail:"Placements that don't fit the candidate end early, which costs the agency and the client."}],
    evidence:[{text:"Website promotes \"the right fit, the first time\" as a service promise.",source:"Website (sample)"}],
-   unknowns:["Would they pay for a fit tool, or expect candidates to use it for free?","Who decides on candidate-assessment tools?"],
+   unknowns:["Do they use personality in matching at all?","Who decides on candidate-assessment tools?"],
    roles:["Director of Operations","Recruitment Manager"],
-   fitConcerns:["Recruiters were a mixed fit in earlier conversations; buyer is unclear.","They may want a screening score, which Myrimaven does not offer."]}},
- {key:"brightwater", name:"Brightwater School Division", sector:"K–12 education", size:"~30 schools", region:"Prairies", signals:["pipeline"], outside:true,
+   fitConcerns:["A recruiter Joan spoke with didn't use personality types in their process.","They may want a screening score, which Myrimaven does not offer."]}},
+ {key:"lumen", name:"Lumen Labs", sector:"Software startup", size:"~40 staff", region:"Calgary", signals:[], fit:"ynnn?yy?", hiring:"~3 open roles (sample)",
+  summary:"Small, fast-growing software company with low turnover.",
+  analysis:{problems:[],
+   evidence:[{text:"Staff reviews describe low turnover and clear promotion paths.",source:"Employer reviews (sample)"}],
+   unknowns:["Is there any career alignment problem at all?"],
+   roles:["Co-founder / CEO"],
+   fitConcerns:["No sign of a career alignment problem.","Too small to need a structured tool."]}},
+ {key:"brightwater", name:"Brightwater School Division", sector:"K–12 education", size:"~30 schools", region:"Prairies", signals:["pipeline"], fit:"ny?????n", outside:true, hiring:"Not checked",
   summary:"School division with a high-school career-education requirement.",
   analysis:{problems:[{title:"Workforce pipeline",detail:"Students must complete career-education courses, but exploration tools are limited."}],
    evidence:[{text:"Career and life management course is required for graduation.",source:"Curriculum page (sample)"}],
    unknowns:["Would a division buy centrally, or does each school decide?"],
    roles:["Career Education Coordinator","Assistant Superintendent, Learning"],
-   fitConcerns:["About 30 K–12 schools contacted earlier gave no response.","Myrimaven is currently focused on adults."]}}
+   fitConcerns:["About 30 cold emails to K–12 schools got no replies.","Myrimaven is focused on adults."]}},
+ {key:"corbel", name:"Corbel Career Coaching", sector:"Career coaching", size:"6 coaches", region:"Calgary", signals:["transitions"], fit:"y?nn????", outside:true, hiring:"Not checked",
+  summary:"Small coaching practice helping professionals change careers.",
+  analysis:{problems:[{title:"Career transitions",detail:"Their clients are mid-career adults exploring new paths."}],
+   evidence:[{text:"Offers one-on-one career transition packages.",source:"Website (sample)"}],
+   unknowns:["Would coaches see the sandbox as a tool or as a competitor?"],
+   roles:["Founder"],
+   fitConcerns:["Career coaches aren't a current target; Joan expects the approach clashes with their methods, but this is untested."]}}
 ];
 
 /* ---------- state ---------- */
-const S = {view:"discover", openId:null, prospects:{}, mode:"loading", loaded:false, coll:null, unsub:null,
-  sample:null, aiOff:false, keep:{q:"", signal:"all", showOutside:false, statusFilter:"all"},
-  preview:null, suggest:{busy:false, ctl:null, err:"", items:[]}, analyze:{busy:false, ctl:null, err:""},
-  rerun:{busy:false, ctl:null, err:""}, confirmDel:null};
+const IN_CLAUDE = !!(window.claude && window.claude.use);
+const S = {view:"discover", openId:null, prospects:{}, mode:"loading", coll:null, unsub:null,
+  sample:null, server:{ai:false, jobs:false}, downloads:null, aiOff:false,
+  keep:{q:"", signal:"all", rating:"all", showOutside:false, statusFilter:"all", sort:"fit"},
+  preview:null, suggest:{busy:false, ctl:null, err:"", items:[]}, analyze:{busy:false, ctl:null, err:"", step:""},
+  rerun:{busy:false, ctl:null, err:""}, jobs:{busy:false, err:""}, confirmDel:null, confirmClear:false};
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cls = v => String(v).replace(/[^A-Za-z]/g, "");
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const clone = o => JSON.parse(JSON.stringify(o));
+const aiOn = () => !S.aiOff && (!!S.sample || S.server.ai);
 function todayISO(off = 0){ const d = new Date(); d.setDate(d.getDate() + off); const z = d.getTimezoneOffset() * 60000; return new Date(d - z).toISOString().slice(0, 10); }
 function fmtDate(iso){ if(!iso) return ""; const d = new Date(iso + "T00:00"); return isNaN(d) ? iso : d.toLocaleDateString("en-CA", {month:"short", day:"numeric"}); }
 function whenClass(iso){ const t = todayISO(); return iso < t ? "over" : iso === t ? "today" : "later"; }
 function whenText(iso){ const t = todayISO(); if(iso < t) return "Overdue · " + fmtDate(iso); if(iso === t) return "Today"; return fmtDate(iso); }
-let toastT; function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3800); }
-const list = () => Object.values(S.prospects).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+let toastT; function toast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 4200); }
+const list = () => Object.values(S.prospects);
 const isSaved = org => list().find(p => (org.key && p.catalogKey === org.key) || p.name.trim().toLowerCase() === org.name.trim().toLowerCase());
+const fitPill = f => `<span class="fit fit-${f.rating}">${f.rating} fit</span>`;
+
+/* ---------- routes ---------- */
+const ROUTE_TITLES = {discover:"Discover", prospects:"Prospects", learn:"Learnings"};
+function go(view, id){
+  if(IN_CLAUDE){ setRoute(view, id || null); return; }
+  const slug = view === "learn" ? "learnings" : view;
+  const h = view === "prospects" && id ? `#/prospects/${id}` : `#/${slug}`;
+  if(location.hash !== h) location.hash = h; else applyRoute();
+}
+function setRoute(view, id){
+  S.view = view; S.openId = id; S.confirmDel = null; S.confirmClear = false; S.preview = null;
+  S.jobs.err = ""; S.rerun.err = "";
+  render(); window.scrollTo(0, 0);
+}
+function applyRoute(){
+  const parts = location.hash.replace(/^#\/?/, "").split("/");
+  const v = {discover:"discover", prospects:"prospects", learnings:"learn"}[parts[0]] || "discover";
+  setRoute(v, v === "prospects" && parts[1] ? parts[1] : null);
+}
+if(!IN_CLAUDE) window.addEventListener("hashchange", applyRoute);
 
 /* ---------- persistence ---------- */
+const LS_KEY = "myrimaven-prospects-v1";
+function lsLoad(){ try{ const r = localStorage.getItem(LS_KEY); return r ? JSON.parse(r) : {}; }catch(_){ return null; } }
+function lsSave(){ if(S.mode !== "local") return; try{ localStorage.setItem(LS_KEY, JSON.stringify(S.prospects)); }catch(_){ toast("Couldn't save in this browser. Changes last until you close the page."); } }
 const queues = {};
 function persist(p){
   p.updatedAt = Date.now();
   S.prospects[p.id] = p;
+  if(S.mode === "local") return lsSave();
   if(S.mode !== "db") return;
   const body = clone(p);
   queues[p.id] = (queues[p.id] || Promise.resolve()).then(() => S.coll.doc(p.id).set(body)).catch(dbFail);
 }
 function removeProspect(id){
   delete S.prospects[id];
+  if(S.mode === "local") return lsSave();
   if(S.mode !== "db") return;
   queues[id] = (queues[id] || Promise.resolve()).then(() => S.coll.doc(id).delete()).catch(dbFail);
 }
@@ -353,12 +500,22 @@ function dbFail(err){
   toast("This view can't save to your account. Changes now last for this visit only.");
   render();
 }
+/* Bring prospects saved by an earlier version up to date */
+function upgrade(p){
+  if(!p.fit){ const c = CATALOG.find(x => x.key === p.catalogKey); p.fit = decodeFit(c ? c.fit : ""); }
+  p.fitWhy = p.fitWhy || {};
+  (p.contacts || []).forEach(c => { if(!c.connection) c.connection = "Unknown"; });
+  (p.outreach || []).forEach(o => { if(o.reason === "Prefers an internal solution") o.reason = "Only uses in-house tools"; });
+  return p;
+}
 
 /* ---------- prospect creation ---------- */
 function newProspect(org, analysis, generatedBy){
   const a = analysis || {problems:[], evidence:[], unknowns:[], roles:[], fitConcerns:[]};
-  return {id:uid(), name:org.name, sector:org.sector || "", size:org.size || "", region:org.region || "", website:org.website || "",
+  const fit = org.fit ? decodeFit(org.fit) : Object.assign(decodeFit(""), a.fit || {});
+  return {id:uid(), name:org.name, sector:org.sector || a.sector || "", size:org.size || a.size || "", region:org.region || "", website:org.website || "",
     summary:org.summary || a.summary || "", signals:org.signals || [], catalogKey:org.key || "", example:false,
+    fit, fitWhy:a.fitWhy || {}, jobs:org.jobs || null,
     analysis:{problems:a.problems || [], evidence:(a.evidence || []).map(e => ({text:e.text, source:e.source, checked:false})),
       unknowns:(a.unknowns || []).map(t => ({text:t, done:false})), roles:a.roles || [], fitConcerns:a.fitConcerns || [],
       generatedBy:generatedBy || "none", generatedAt:todayISO()},
@@ -369,36 +526,57 @@ function loadExamples(){
   const by = k => CATALOG.find(c => c.key === k);
   const a = newProspect(by("northgate"), by("northgate").analysis, "sample");
   a.example = true; a.status = "Follow-Up";
-  const c1 = {id:uid(), name:"Priya Sandhu", role:"Director of Continuing Education", email:"priya.sandhu@example.org", phone:"", authority:"Decision-maker", notes:"Met through a former colleague."};
+  const c1 = {id:uid(), name:"Priya Sandhu", role:"Director of Continuing Education", email:"priya.sandhu@example.org", phone:"", authority:"Decision-maker", connection:"Warm", notes:"Met through a former colleague."};
   a.contacts = [c1];
-  a.outreach = [{id:uid(), date:todayISO(-6), contactId:c1.id, channel:"Warm intro", outcome:"Interested", reason:"", learned:"Non-completion in two programs is her biggest worry. Budget for next year is set in April."}];
+  a.outreach = [{id:uid(), date:todayISO(-6), contactId:c1.id, connection:"Warm", channel:"Warm intro", outcome:"Interested", reason:"", learned:"Non-completion in two programs is her biggest worry. Budget for next year is set in April."}];
   a.analysis.evidence[0].checked = true; a.analysis.unknowns[0].done = true;
   a.nextAction = "Send a one-page pilot outline for one program"; a.followUpDate = todayISO(4);
   const b = newProspect(by("prairiehealth"), by("prairiehealth").analysis, "sample");
   b.example = true; b.status = "Contacted";
-  const c2 = {id:uid(), name:"Marcus Lee", role:"HR Generalist", email:"", phone:"", authority:"No purchasing authority", notes:"Friendly; offered an introduction."};
-  const c3 = {id:uid(), name:"(name not yet known)", role:"VP People & Culture", email:"", phone:"", authority:"Decision-maker", notes:"Owns retention initiatives."};
+  const c2 = {id:uid(), name:"Marcus Lee", role:"HR Generalist", email:"", phone:"", authority:"No purchasing authority", connection:"Warm", notes:"Friendly; offered an introduction."};
+  const c3 = {id:uid(), name:"(name not yet known)", role:"VP People & Culture", email:"", phone:"", authority:"Decision-maker", connection:"Referral", notes:"Owns retention initiatives."};
   b.contacts = [c2, c3];
-  b.outreach = [{id:uid(), date:todayISO(-9), contactId:c2.id, channel:"Email", outcome:"Referred elsewhere", reason:"No purchasing authority", learned:"Retention projects sit with the VP People & Culture, not HR generalists."}];
+  b.outreach = [{id:uid(), date:todayISO(-9), contactId:c2.id, connection:"Warm", channel:"Email", outcome:"Referred elsewhere", reason:"No purchasing authority", learned:"Retention projects sit with the VP People & Culture, not HR generalists."}];
   b.nextAction = "Ask Marcus for the introduction to the VP"; b.followUpDate = todayISO(-1);
   const c = newProspect(by("bowline"), by("bowline").analysis, "sample");
-  c.example = true; c.status = "Not a Fit";
-  const c4 = {id:uid(), name:"Dana Kowalski", role:"HR Manager", email:"", phone:"", authority:"Influencer", notes:""};
+  c.example = true; c.status = "Not a Fit"; c.fit.vendors = "no";
+  const c4 = {id:uid(), name:"Dana Kowalski", role:"HR Manager", email:"", phone:"", authority:"Influencer", connection:"Cold", notes:""};
   c.contacts = [c4];
-  c.outreach = [{id:uid(), date:todayISO(-14), contactId:c4.id, channel:"LinkedIn", outcome:"Not interested", reason:"Prefers an internal solution", learned:"They're building an in-house training ladder with their union and aren't looking at outside tools this year."}];
+  c.outreach = [{id:uid(), date:todayISO(-14), contactId:c4.id, connection:"Cold", channel:"LinkedIn", outcome:"Not interested", reason:"Only uses in-house tools", learned:"They're building an in-house training ladder with their union and aren't looking at outside tools this year."}];
   c.fitNote = "Building their own program. Smaller employers with hands-on training may not need an exploration tool.";
   [a, b, c].forEach(p => { if(!isSaved(p)) persist(p); });
   toast("Added three worked examples. They're marked Example.");
   render();
 }
 
-/* ---------- AI ---------- */
-const CONTEXT = `Myrimaven is an early-stage company that offers a personality-based career exploration sandbox for adults. Joan, its founder, is looking for ORGANIZATIONS that might pay for it. A good prospect has a "career alignment problem": employee retention, reskilling needs, career transitions, or workforce pipeline problems. Myrimaven has no paying organizational customer yet, so the ideal customer is still being discovered. K–12 schools gave no response in earlier outreach, and career coaches are not a current target. Joan wants to understand WHY an organization might be a prospect, not a score.`;
+/* ---------- AI and job postings ---------- */
+async function apiCall(url, body, signal){
+  let r;
+  try{ r = await fetch(url, body ? {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body), signal} : {signal}); }
+  catch(e){ throw {code: e && e.name === "AbortError" ? "cancelled" : "network"}; }
+  if(!r.ok) throw {code: r.status === 501 ? "not_configured" : r.status === 429 ? "rate_limited" : "upstream_error"};
+  return r.json();
+}
+async function aiAnalysis(name, website, notes, signal, fresh){
+  if(S.sample) return PROMPTS.normAnalysis(await S.sample.json(PROMPTS.analysis(name, website, notes), fresh ? {signal, cache:false} : {signal}));
+  return apiCall("/api/analyze", {name, website, notes}, signal);
+}
+async function aiSuggest(query, region, signal){
+  if(S.sample) return PROMPTS.normSuggest(await S.sample.json(PROMPTS.suggest(query, region), {signal}));
+  return apiCall("/api/suggest", {query, region}, signal);
+}
+const fetchJobs = (company, where) => apiCall(`/api/jobs?company=${encodeURIComponent(company)}&where=${encodeURIComponent(where || "")}`);
+function jobsText(j){
+  if(!j) return "";
+  return `Job postings (Adzuna, last ${j.searched.days} days${j.searched.where ? ", " + j.searched.where : ""}): ${j.count} postings found; ${j.peopleRoles} of the ${Math.min(20, j.count)} most recent are HR, training or talent roles. Recent titles: ${j.sample.map(x => x.title).join("; ") || "none"}.`;
+}
+function jobsEvidence(j){ return {text:`${j.count} job postings in the last ${j.searched.days} days, ${j.peopleRoles} in HR, training or talent roles.`, source:`Adzuna job postings, ${fmtDate(j.checkedAt)}`, checked:true}; }
 
 function aiErr(e){
   const c = e && e.code;
-  if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(c)){ S.aiOff = true; return "AI isn't available in this view. You can still use the sample organizations and add prospects by hand."; }
+  if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed","not_configured"].includes(c)){ S.aiOff = true; return "AI analysis isn't connected in this version. You can still use the sample organizations and add prospects by hand."; }
   if(c === "cancelled") return "";
+  if(c === "network") return "Couldn't reach the server. Check your connection and try again.";
   if(c === "rate_limited") return "Too many AI requests right now. Wait a minute, then try again.";
   if(c === "session_expired") return "Your session expired. Sign in again to use AI.";
   if(c === "refused") return "Claude declined this request. Try rewording what you pasted.";
@@ -406,105 +584,117 @@ function aiErr(e){
   if(c === "invalid_json" || c === "empty_completion") return "The answer came back in an unexpected shape. Try again.";
   return "The AI request failed. Try again.";
 }
-const strArr = v => Array.isArray(v) ? v.map(x => typeof x === "string" ? x : (x && (x.text || x.title)) || "").filter(Boolean).slice(0, 8) : [];
-function normAnalysis(r){
-  r = r && typeof r === "object" ? r : {};
-  return {
-    summary:String(r.summary || ""), sector:String(r.sector || ""),
-    problems:(Array.isArray(r.problems) ? r.problems : []).map(p => typeof p === "string" ? {title:p, detail:""} : {title:String(p.title || ""), detail:String(p.detail || "")}).filter(p => p.title).slice(0, 5),
-    evidence:(Array.isArray(r.evidence) ? r.evidence : []).map(e => typeof e === "string" ? {text:e, source:"AI"} : {text:String(e.text || ""), source:String(e.source || "AI")}).filter(e => e.text).slice(0, 8),
-    unknowns:strArr(r.unknowns), roles:strArr(r.roles), fitConcerns:strArr(r.fitConcerns)
-  };
-}
-function analysisPrompt(name, website, notes){
-  return `${CONTEXT}
-
-Assess this organization for Joan.
-Organization: ${name}
-Website: ${website || "(not given)"}
-What Joan knows or has pasted (job postings, news, conversation notes; may be empty):
-"""
-${(notes || "").slice(0, 8000)}
-"""
-
-Rules:
-- Do not give a score and do not tell Joan whether to contact them. Give her the reasoning so she can decide.
-- Keep evidence honest. For each evidence item, set "source" to "Joan's notes" when it comes from the text above, or "General knowledge, verify" when it comes from your own background knowledge. Never invent specific numbers, dates, or quotes.
-- If you know little about this organization, say so in the summary and lean on unknowns.
-- Unknowns are questions Joan must answer before investing outreach time (budget, who decides, whether the problem is real).
-- Roles are job titles (not names) most likely to own the problem or the budget.
-
-Reply with only JSON in this shape:
-{"summary":"1-2 sentences","sector":"short sector label","problems":[{"title":"Employee retention | Reskilling | Career transitions | Workforce pipeline | other short label","detail":"one sentence"}],"evidence":[{"text":"one sentence","source":"Joan's notes | General knowledge, verify"}],"unknowns":["question"],"roles":["job title"],"fitConcerns":["reason it might not be a fit"]}`;
-}
-async function runAnalyze(name, website, notes, signals){
-  if(!S.sample || S.aiOff) return;
-  if(S.analyze.ctl) S.analyze.ctl.abort();
-  const ctl = new AbortController();
-  S.analyze = {busy:true, ctl, err:""}; paintAnalyzeStatus();
-  try{
-    const r = await S.sample.json(analysisPrompt(name, website, notes), {signal:ctl.signal});
-    const a = normAnalysis(r);
-    S.preview = {org:{name, website, sector:a.sector, summary:a.summary, signals:signals || guessSignals(a)}, analysis:a, by:"ai"};
-    S.analyze = {busy:false, ctl:null, err:""};
-    paintAnalyzeStatus(); renderSheet();
-  }catch(e){
-    S.analyze = {busy:false, ctl:null, err:aiErr(e)}; paintAnalyzeStatus();
-  }
-}
 function guessSignals(a){
-  const t = a.problems.map(p => p.title.toLowerCase()).join(" ");
+  const t = (a.problems || []).map(p => p.title.toLowerCase()).join(" ");
   const map = {retention:"retention", reskilling:"reskill", transitions:"transition", pipeline:"pipeline"};
   return Object.keys(map).filter(k => t.includes(map[k]));
 }
+async function runAnalyze(name, website, notes, signals, region){
+  if(!aiOn()) return;
+  if(S.analyze.ctl) S.analyze.ctl.abort();
+  const ctl = new AbortController();
+  S.analyze = {busy:true, ctl, err:"", step:""}; paintAnalyzeStatus();
+  let jobs = null;
+  try{
+    if(S.server.jobs){
+      S.analyze.step = "Checking job postings"; paintAnalyzeStatus();
+      try{ jobs = await fetchJobs(name, region || ""); }catch(_){ jobs = null; }
+      if(ctl.signal.aborted) throw {code:"cancelled"};
+    }
+    S.analyze.step = "Analyzing"; paintAnalyzeStatus();
+    const a = await aiAnalysis(name, website, [notes, jobsText(jobs)].filter(Boolean).join("\n\n"), ctl.signal);
+    if(jobs) a.evidence = [jobsEvidence(jobs)].concat(a.evidence || []);
+    S.preview = {org:{name, website, sector:a.sector, size:a.size, summary:a.summary, signals:signals || guessSignals(a), jobs}, analysis:a, by:"ai"};
+    S.analyze = {busy:false, ctl:null, err:"", step:""};
+    paintAnalyzeStatus(); renderSheet();
+  }catch(e){
+    S.analyze = {busy:false, ctl:null, err:aiErr(e), step:""}; paintAnalyzeStatus();
+  }
+}
 async function runSuggest(query, region){
-  if(!S.sample || S.aiOff) return;
+  if(!aiOn()) return;
   if(S.suggest.ctl) S.suggest.ctl.abort();
   const ctl = new AbortController();
   S.suggest = {busy:true, ctl, err:"", items:[]}; paintSuggest();
-  const prompt = `${CONTEXT}
-
-Joan is looking for: ${query || "organizations with a career alignment problem"}
-Region: ${region || "any"}
-
-Suggest up to 6 candidates. Prefer adult-focused organizations. Avoid K–12 schools and career coaches unless Joan asks for them. Only name a specific organization if you are confident it exists; otherwise describe a type of organization (kind "type") she could search for. Never invent facts about a named organization; give reasons as things to check.
-
-Reply with only a JSON array:
-[{"name":"organization name or organization type","kind":"organization | type","sector":"short label","region":"where","signals":["retention | reskilling | transitions | pipeline"],"rationale":"one sentence on why it might have the problem","verify":"one concrete way Joan can check the signal"}]`;
   try{
-    const r = await S.sample.json(prompt, {signal:ctl.signal});
-    const items = (Array.isArray(r) ? r : []).filter(x => x && x.name).slice(0, 6).map(x => ({
-      name:String(x.name), kind:x.kind === "type" ? "type" : "organization", sector:String(x.sector || ""), region:String(x.region || ""),
-      signals:strArr(x.signals).filter(s => SIGNALS[s]), rationale:String(x.rationale || ""), verify:String(x.verify || "")}));
+    const items = await aiSuggest(query, region, ctl.signal);
     S.suggest = {busy:false, ctl:null, err:items.length ? "" : "No suggestions came back. Try describing the organizations differently.", items};
   }catch(e){ S.suggest = {busy:false, ctl:null, err:aiErr(e), items:[]}; }
   paintSuggest();
 }
 async function rerunAnalysis(p){
-  if(!S.sample || S.aiOff) return;
+  if(!aiOn()) return;
   const ctl = new AbortController();
   S.rerun = {busy:true, ctl, err:""}; render();
   const notes = [
     p.summary && "Summary: " + p.summary,
     p.analysis.evidence.length && "Evidence so far:\n" + p.analysis.evidence.map(e => `- ${e.text} (${e.source}${e.checked ? ", checked by Joan" : ""})`).join("\n"),
-    p.contacts.length && "Contacts:\n" + p.contacts.map(c => `- ${c.role} (${c.authority})`).join("\n"),
+    p.contacts.length && "Contacts:\n" + p.contacts.map(c => `- ${c.role} (${c.authority}, ${c.connection})`).join("\n"),
     p.outreach.length && "Outreach so far:\n" + p.outreach.map(o => `- ${o.date} ${o.channel}: ${o.outcome}${o.reason ? " (" + o.reason + ")" : ""}. ${o.learned}`).join("\n"),
+    p.jobs && jobsText(p.jobs),
     p.notes && "Joan's notes: " + p.notes
   ].filter(Boolean).join("\n\n");
   try{
-    const a = normAnalysis(await S.sample.json(analysisPrompt(p.name, p.website, notes), {signal:ctl.signal, cache:false}));
+    const a = await aiAnalysis(p.name, p.website, notes, ctl.signal, true);
     const fresh = S.prospects[p.id]; if(!fresh) return;
-    const keepEv = fresh.analysis.evidence.filter(e => e.checked || e.source === "Added by Joan");
+    const keepEv = fresh.analysis.evidence.filter(e => e.checked || e.mine);
     const keepUn = fresh.analysis.unknowns.filter(u => u.done || u.mine);
     const seen = new Set(keepEv.map(e => e.text.toLowerCase()));
     fresh.analysis = {problems:a.problems, roles:a.roles, fitConcerns:a.fitConcerns, generatedBy:"ai", generatedAt:todayISO(),
-      evidence:keepEv.concat(a.evidence.filter(e => !seen.has(e.text.toLowerCase())).map(e => ({...e, checked:false}))),
-      unknowns:keepUn.concat(a.unknowns.filter(t => !keepUn.some(u => u.text.toLowerCase() === t.toLowerCase())).map(t => ({text:t, done:false})))};
+      evidence:keepEv.concat((a.evidence || []).filter(e => !seen.has(e.text.toLowerCase())).map(e => ({...e, checked:false}))),
+      unknowns:keepUn.concat((a.unknowns || []).filter(t => !keepUn.some(u => u.text.toLowerCase() === t.toLowerCase())).map(t => ({text:t, done:false})))};
+    /* AI only fills criteria Joan hasn't decided yet */
+    Object.entries(a.fit || {}).forEach(([k, v]) => { if(fresh.fit[k] === "unknown" && v !== "unknown"){ fresh.fit[k] = v; if(a.fitWhy && a.fitWhy[k]) fresh.fitWhy[k] = a.fitWhy[k]; } });
     if(a.summary && !fresh.summary) fresh.summary = a.summary;
     persist(fresh);
-    S.rerun = {busy:false, ctl:null, err:""}; toast("Assessment updated. Your checked evidence and unknowns were kept.");
+    S.rerun = {busy:false, ctl:null, err:""}; toast("Assessment updated. Your checked evidence, unknowns and fit answers were kept.");
   }catch(e){ S.rerun = {busy:false, ctl:null, err:aiErr(e)}; }
   render();
+}
+async function checkJobs(p){
+  S.jobs = {busy:true, err:""}; render();
+  try{
+    const j = await fetchJobs(p.name, p.region);
+    const fresh = S.prospects[p.id]; if(!fresh) return;
+    fresh.jobs = j;
+    fresh.analysis.evidence = fresh.analysis.evidence.filter(e => !/^Adzuna/.test(e.source));
+    fresh.analysis.evidence.unshift(jobsEvidence(j));
+    let msg = `Found ${j.count} postings.`;
+    if(j.count >= 5 && fresh.fit.hiring !== "yes"){ fresh.fit.hiring = "yes"; fresh.fitWhy.hiring = `${j.count} postings on Adzuna in the last ${j.searched.days} days.`; msg += " Set \"Active hiring\" to Yes."; }
+    persist(fresh); S.jobs = {busy:false, err:""}; toast(msg);
+  }catch(e){ S.jobs = {busy:false, err:e && e.code === "not_configured" ? "Job postings aren't connected in this version." : "Couldn't check job postings. Try again."}; }
+  render();
+}
+
+/* ---------- CSV export ---------- */
+function csv(rows){ return rows.map(r => r.map(v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(",")).join("\r\n"); }
+function exportProspects(){
+  const rows = [["Organization","Sector","Size","Region","Fit rating","Criteria met","Criteria not met","Status","Main problem","Contacts","Last outreach","Next action","Follow-up date","Notes"]];
+  list().sort(fitSort).forEach(p => {
+    const f = fitOf(p); const last = p.outreach.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+    rows.push([p.name, p.sector, p.size, p.region, f.rating, f.yes.map(c => c.label).join("; "), f.no.map(c => c.label).join("; "), p.status,
+      p.analysis.problems[0] ? p.analysis.problems[0].title : "", p.contacts.map(c => `${c.name} (${c.role}, ${c.authority}, ${c.connection})`).join("; "),
+      last ? `${last.date} ${last.outcome}` : "", p.nextAction, p.followUpDate, p.notes]);
+  });
+  saveFile("myrimaven-prospects.csv", csv(rows));
+}
+function exportOutreach(){
+  const rows = [["Date","Organization","Contact","Role","Connection","Channel","Response","Reason not a fit","What was learned"]];
+  list().forEach(p => p.outreach.forEach(o => { const c = p.contacts.find(x => x.id === o.contactId);
+    rows.push([o.date, p.name, c ? c.name : "", c ? c.role : "", o.connection || (c && c.connection) || "", o.channel, o.outcome, o.reason, o.learned]); }));
+  rows.splice(1, rows.length, ...rows.slice(1).sort((a, b) => b[0].localeCompare(a[0])));
+  saveFile("myrimaven-outreach.csv", csv(rows));
+}
+async function saveFile(name, text){
+  if(S.downloads){
+    try{ await S.downloads.save({filename:name, data:text}); }
+    catch(e){ if(e && e.code !== "declined") toast("Couldn't save the file here."); }
+    return;
+  }
+  if(IN_CLAUDE){ toast("Downloads aren't available in this view."); return; }
+  const url = URL.createObjectURL(new Blob(["﻿" + text], {type:"text/csv"}));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* ---------- rendering ---------- */
@@ -514,13 +704,17 @@ function render(){
     `<button class="tab" data-act="nav" data-view="${v}" ${S.view === v ? 'aria-current="page"' : ""}>${l}${v === "prospects" && n ? `<span class="n">${n}</span>` : ""}</button>`).join("");
   const st = $("#store");
   st.className = "store " + S.mode;
-  st.querySelector("span").textContent = S.mode === "db" ? "Saved to your account" : S.mode === "memory" ? "This visit only" : "Connecting…";
+  st.querySelector("span").textContent = S.mode === "db" ? "Saved to your account" : S.mode === "local" ? "Saved in this browser" : S.mode === "memory" ? "This visit only" : "Connecting…";
+  const op = S.openId && S.prospects[S.openId];
+  document.title = (op ? op.name : ROUTE_TITLES[S.view]) + " · Myrimaven Prospect Desk";
   const m = $("#main");
   if(S.view === "discover") m.innerHTML = discoverHTML();
-  else if(S.view === "prospects") m.innerHTML = (S.openId && S.prospects[S.openId]) ? profileHTML(S.prospects[S.openId]) : listHTML();
+  else if(S.view === "prospects") m.innerHTML = op ? profileHTML(op) : listHTML();
   else m.innerHTML = learnHTML();
   renderSheet();
 }
+const HOW_RATE = `<details class="howrate"><summary>How the fit rating works</summary>
+  <p>The rating counts which of Joan's eight criteria are met. It is not a prediction. <b>Strong</b> = 5 or more met. <b>Moderate</b> = 3 or 4 met. <b>Weak</b> = 2 or fewer, or a "No" on a must-have: serves adults, has a career alignment problem, open to outside tools. Every criterion can be changed on the prospect, and contacts and outreach update it as you go.</p></details>`;
 
 /* Discover */
 function discoverHTML(){
@@ -528,7 +722,7 @@ function discoverHTML(){
   return `
   <section class="intro">
     <div><p class="eyebrow">Discover</p><h1>Find organizations with a career alignment problem</h1>
-      <p class="lede">Start from a signal, read why an organization might need Myrimaven, then save the ones worth your outreach time.</p></div>
+      <p class="lede">Organizations are sorted by fit, so the most promising come first. Open one to see why it might need Myrimaven, then save the ones worth your outreach time.</p></div>
     <ol class="steps"><li><b>Find</b> an organization showing a signal</li><li><b>Qualify</b> the problem and the right contact</li><li><b>Contact and learn</b>, even from a no</li></ol>
   </section>
   <div class="discover">
@@ -536,8 +730,10 @@ function discoverHTML(){
       <div class="row">
         <label class="f">Search sample organizations<input type="search" id="q" data-keep="q" value="${esc(S.keep.q)}" placeholder="Name, sector or region"></label>
       </div>
+      <div class="chips" id="rchips">${ratingChipsHTML()}</div>
       <div class="chips" id="chips">${chipsHTML()}</div>
       <label class="toggle"><input type="checkbox" id="showOutside" ${S.keep.showOutside ? "checked" : ""}> Show organizations outside the current focus (${outsideN})</label>
+      ${HOW_RATE}
       <p class="note">Sample organizations are fictional, for practice and demos. Use the AI tools to look at real ones.</p>
       <div class="cards" id="cards">${cardsHTML()}</div>
     </div>
@@ -548,37 +744,49 @@ function chipsHTML(){
   return [["all","All signals"], ...Object.entries(SIGNALS)].map(([k, l]) =>
     `<button class="chip" data-act="signal" data-k="${k}" aria-pressed="${S.keep.signal === k}">${l}</button>`).join("");
 }
+function ratingChipsHTML(){
+  return [["all","All fits"],["Strong","Strong"],["Moderate","Moderate"],["Weak","Weak"]].map(([k, l]) =>
+    `<button class="chip" data-act="rating" data-k="${k}" aria-pressed="${S.keep.rating === k}">${l}</button>`).join("");
+}
 function cardsHTML(){
   const q = S.keep.q.trim().toLowerCase();
-  const items = CATALOG.filter(c => (S.keep.showOutside || !c.outside)
-    && (S.keep.signal === "all" || c.signals.includes(S.keep.signal))
-    && (!q || [c.name, c.sector, c.region, c.summary].join(" ").toLowerCase().includes(q)));
-  if(!items.length) return `<p class="note">No sample organizations match. Clear the search or pick another signal.</p>`;
-  return items.map(c => `
+  const items = CATALOG.map(c => ({c, f:fitOf({fit:decodeFit(c.fit), contacts:[]})}))
+    .filter(({c, f}) => (S.keep.showOutside || !c.outside)
+      && (S.keep.signal === "all" || c.signals.includes(S.keep.signal))
+      && (S.keep.rating === "all" || f.rating === S.keep.rating)
+      && (!q || [c.name, c.sector, c.region, c.summary].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => RANK[a.f.rating] - RANK[b.f.rating] || b.f.yes.length - a.f.yes.length || a.f.no.length - b.f.no.length);
+  if(!items.length) return `<p class="note">No sample organizations match. Clear the search or pick another filter.</p>`;
+  return items.map(({c, f}) => `
     <article class="org">
+      <div class="fitline">${fitPill(f)}<span>Meets ${f.yes.length} of ${CRIT.length}${f.deal.length ? ` · No on: ${esc(f.deal.map(d => d.label.toLowerCase()).join(", "))}` : ""}</span></div>
       <div><h3>${esc(c.name)}</h3><p class="sub">${esc(c.sector)} · ${esc(c.size)} · ${esc(c.region)}</p></div>
       <p class="sum">${esc(c.summary)}</p>
-      <div class="tags">${c.signals.map(s => `<span class="tag">${SIGNALS[s]}</span>`).join("")}</div>
-      ${c.outside ? `<p class="flag">Outside current focus: K–12 outreach got no responses and Myrimaven is focused on adults.</p>` : ""}
+      ${c.signals.length ? `<div class="tags">${c.signals.map(s => `<span class="tag">${SIGNALS[s]}</span>`).join("")}</div>` : ""}
+      <p class="hire">Hiring: ${esc(c.hiring)}</p>
+      ${c.outside ? `<p class="flag">Outside current focus: ${c.sector.startsWith("K") ? "K–12 outreach got no replies and Myrimaven is focused on adults." : "career coaches aren't a current target."}</p>` : ""}
       <div class="foot"><button class="btn small" data-act="preview" data-key="${c.key}">Why is this a prospect?</button>${isSaved(c) ? `<span class="saved">Saved</span>` : ""}</div>
     </article>`).join("");
 }
 function aiPanelHTML(){
-  const off = !S.sample || S.aiOff;
-  const offNote = off ? `<p class="note">${S.mode === "loading" ? "Checking whether AI is available…" : "AI isn't available in this view. You can still save an organization by hand."}</p>` : "";
+  const off = !aiOn();
+  const offNote = off ? `<p class="note">${S.mode === "loading" ? "Checking whether AI is available…" : "AI analysis isn't connected in this version yet. Use the sample organizations, or save an organization by hand."}</p>` : "";
   return `
   <div class="panel">
-    <div><h2>Suggest organizations</h2><p class="note">Describe who you're looking for. Suggestions are unverified until you check them.</p></div>
-    <label class="f">Looking for<textarea id="sq" data-keep="sq" rows="3" placeholder="e.g. Mid-size employers with high turnover in frontline roles">${esc(S.keep.sq || "")}</textarea></label>
-    <label class="f">Region<input type="text" id="sr" data-keep="sr" value="${esc(S.keep.sr || "")}" placeholder="e.g. Calgary and area"></label>
+    <div><h2>Suggest organizations</h2><p class="note">Describe who you're looking for. Suggestions are unverified until you check them.${S.server.jobs ? " Each named organization shows its live job-posting count." : ""}</p></div>
+    <label class="f">Looking for<textarea id="sq" data-keep="sq" rows="3" placeholder="e.g. Large employers with high turnover in frontline roles">${esc(S.keep.sq || "")}</textarea></label>
+    <label class="f">Region<input type="text" id="sr" data-keep="sr" value="${esc(S.keep.sr || "")}" placeholder="e.g. Calgary"></label>
     <div class="row"><button class="btn primary" data-act="suggest" ${off || S.suggest.busy ? "disabled" : ""}>Suggest organizations</button></div>
     <div id="suggest-out">${suggestOutHTML()}</div>
     ${offNote}
   </div>
   <div class="panel">
-    <div><h2>Analyze an organization</h2><p class="note">Get an assessment of why it might need Myrimaven, the evidence, and what's still unknown.</p></div>
+    <div><h2>Analyze an organization</h2><p class="note">Get its fit rating, why it might need Myrimaven, the evidence, and what's still unknown.${S.server.jobs ? " Recent job postings are pulled in first." : ""}</p></div>
     <label class="f">Organization name<input type="text" id="an" data-keep="an" value="${esc(S.keep.an || "")}" placeholder="e.g. Mount Royal University, Continuing Education"></label>
-    <label class="f">Website (optional)<input type="text" id="aw" data-keep="aw" value="${esc(S.keep.aw || "")}" placeholder="example.org"></label>
+    <div class="row">
+      <label class="f">Website (optional)<input type="text" id="aw" data-keep="aw" value="${esc(S.keep.aw || "")}" placeholder="example.org"></label>
+      <label class="f">Region (optional)<input type="text" id="ar" data-keep="ar" value="${esc(S.keep.ar || "")}" placeholder="e.g. Calgary"></label>
+    </div>
     <label class="f">What you know or have found<textarea id="ax" data-keep="ax" rows="4" placeholder="Paste a job posting, a news snippet, or notes from a conversation">${esc(S.keep.ax || "")}</textarea></label>
     <div class="row"><button class="btn primary" data-act="analyze" ${off || S.analyze.busy ? "disabled" : ""}>Analyze</button><button class="btn" data-act="save-manual">Save without AI</button></div>
     <div id="analyze-out">${analyzeOutHTML()}</div>
@@ -594,6 +802,7 @@ function suggestOutHTML(){
       <b>${esc(x.name)}</b><span class="note">${esc([x.sector, x.region].filter(Boolean).join(" · "))}</span>
       ${x.signals.length ? `<div class="tags">${x.signals.map(k => `<span class="tag">${SIGNALS[k]}</span>`).join("")}</div>` : ""}
       <span>${esc(x.rationale)}</span>
+      ${x.postings ? `<span class="hire">Job postings, last 60 days: ${x.postings.count} (${x.postings.peopleRoles} HR or training)</span>` : ""}
       ${x.verify ? `<span class="verify">Check: ${esc(x.verify)}</span>` : ""}
       <div><button class="btn small" data-act="analyze-sugg" data-i="${i}" ${x.kind === "type" ? "disabled title='Find a specific organization of this type first'" : ""}>Analyze this one</button></div>
     </div>`).join("")}</div>`;
@@ -601,15 +810,32 @@ function suggestOutHTML(){
 }
 function analyzeOutHTML(){
   const a = S.analyze;
-  if(a.busy) return `<p class="status-line"><span class="dots">Thinking</span><span>This can take up to a minute.</span><button class="btn ghost small" data-act="stop" data-what="analyze">Stop</button></p>`;
+  if(a.busy) return `<p class="status-line"><span class="dots">${esc(a.step || "Thinking")}</span><span>This can take up to a minute.</span><button class="btn ghost small" data-act="stop" data-what="analyze">Stop</button></p>`;
   return a.err ? `<p class="status-line err">${esc(a.err)}</p>` : "";
 }
-function paintSuggest(){ const o = $("#suggest-out"); if(o) o.innerHTML = suggestOutHTML(); const b = document.querySelector('[data-act="suggest"]'); if(b) b.disabled = S.suggest.busy || !S.sample || S.aiOff; }
-function paintAnalyzeStatus(){ const o = $("#analyze-out"); if(o) o.innerHTML = analyzeOutHTML(); const b = document.querySelector('[data-act="analyze"]'); if(b) b.disabled = S.analyze.busy || !S.sample || S.aiOff; }
+function paintSuggest(){ const o = $("#suggest-out"); if(o) o.innerHTML = suggestOutHTML(); const b = document.querySelector('[data-act="suggest"]'); if(b) b.disabled = S.suggest.busy || !aiOn(); }
+function paintAnalyzeStatus(){ const o = $("#analyze-out"); if(o) o.innerHTML = analyzeOutHTML(); const b = document.querySelector('[data-act="analyze"]'); if(b) b.disabled = S.analyze.busy || !aiOn(); }
+
+/* Fit criteria: read-only summary (preview) or editable (profile) */
+function fitHTML(p, editable){
+  const f = fitOf(p);
+  const why = p.fitWhy || {};
+  const head = `<div class="fitline">${fitPill(f)}<span>Meets ${f.yes.length} of ${CRIT.length}${f.unk.length ? ` · ${f.unk.length} unknown` : ""}${f.deal.length ? ` · No on a must-have` : ""}</span></div>`;
+  if(!editable){
+    return head + `<ul class="mini-crit" style="margin-top:8px">${CRIT.map(c => `<li><span class="mark ${f.v[c.k]}">${({yes:"✓", no:"✕", unknown:"?"})[f.v[c.k]]}</span>${esc(c.label)}</li>`).join("")}</ul>`;
+  }
+  return head + `<ul class="crit">${CRIT.map(c => {
+    const v = f.v[c.k], auto = f.auto[c.k];
+    return `<li><span class="cl">${esc(c.label)}${c.deal ? `<span class="deal">Must-have</span>` : ""}</span>
+      <span class="seg" role="group" aria-label="${esc(c.label)}">${["yes","no","unknown"].map(o => `<button class="v-${o}" data-act="fit" data-k="${c.k}" data-v="${o}" aria-pressed="${v === o}" ${auto ? "disabled" : ""}>${({yes:"Yes", no:"No", unknown:"?"})[o]}</button>`).join("")}</span>
+      <span class="ch">${auto ? "Set from your contacts" : esc(c.hint)}</span>
+      ${why[c.k] && !auto ? `<span class="why">${esc(why[c.k])}</span>` : ""}</li>`;
+  }).join("")}</ul>`;
+}
 
 /* Analysis block (read-only for preview, interactive in a profile) */
 function analysisHTML(a, by, p){
-  const label = by === "ai" ? "AI assessment. There is no score: use the evidence and unknowns to make your own call."
+  const label = by === "ai" ? "AI assessment. Use the evidence and unknowns to make your own call."
     : by === "sample" ? "Prepared assessment for a sample organization."
     : "No assessment yet. Add evidence and unknowns as you find them.";
   const evid = (a.evidence || []).map((e, i) => {
@@ -625,7 +851,7 @@ function analysisHTML(a, by, p){
   return `<div class="analysis">
     <p class="ai-label">${label}</p>
     ${a.summary ? `<p>${esc(a.summary)}</p>` : ""}
-    <div class="list-block"><h4>Potential problems</h4>${(a.problems || []).length ? `<ul class="list problems">${a.problems.map(x => `<li><b>${esc(x.title)}</b><span>${esc(x.detail)}</span></li>`).join("")}</ul>` : `<p class="note">None identified yet.</p>`}</div>
+    <div><h4>Potential problems</h4>${(a.problems || []).length ? `<ul class="list problems">${a.problems.map(x => `<li><b>${esc(x.title)}</b><span>${esc(x.detail)}</span></li>`).join("")}</ul>` : `<p class="note">None identified.</p>`}</div>
     <div><h4>Supporting evidence${p ? " · tick what you've checked" : ""}</h4><ul class="list">${evid || `<li class="note">No evidence yet.</li>`}</ul>
       ${p ? `<form class="inline-add" data-form="evidence" style="margin-top:8px"><input type="text" name="t" id="add-ev" placeholder="Add evidence you found" required><input type="text" name="s" id="add-ev-src" placeholder="Source (e.g. job posting)" style="flex:0 1 170px"><button class="btn small">Add</button></form>` : ""}</div>
     <div><h4>Still to validate</h4><ul class="list">${unk || `<li class="note">Nothing listed.</li>`}</ul>
@@ -641,12 +867,14 @@ function renderSheet(){
   const pv = S.preview;
   if(!pv){ root.innerHTML = ""; return; }
   const saved = isSaved(pv.org);
+  const pseudo = {fit:pv.org.fit ? decodeFit(pv.org.fit) : Object.assign(decodeFit(""), pv.analysis.fit || {}), fitWhy:pv.analysis.fitWhy || {}, contacts:[]};
   root.innerHTML = `<div class="scrim" data-act="close-sheet"></div>
    <aside class="sheet" role="dialog" aria-modal="true" aria-label="${esc(pv.org.name)}">
     <div class="sheet-head"><div><p class="eyebrow">Why might this organization need Myrimaven?</p><h2 style="margin-top:4px">${esc(pv.org.name)}</h2>
       <p class="note" style="margin-top:4px">${esc([pv.org.sector, pv.org.size, pv.org.region].filter(Boolean).join(" · "))}</p></div>
       <button class="btn ghost" data-act="close-sheet" aria-label="Close">Close</button></div>
     ${pv.org.summary && pv.by !== "ai" ? `<p>${esc(pv.org.summary)}</p>` : ""}
+    <div><h4 style="margin-bottom:8px">Fit against your criteria</h4>${fitHTML(pseudo, false)}</div>
     ${analysisHTML(pv.analysis, pv.by)}
     <div class="sheet-actions">
       ${saved ? `<button class="btn primary" data-act="open" data-id="${saved.id}">Open saved prospect</button>`
@@ -659,13 +887,14 @@ function renderSheet(){
 
 /* Prospects list */
 function modeBanner(){
-  if(S.mode === "memory") return `<p class="banner">This view can't save to your account, so prospects last until you close the page.</p>`;
+  if(S.mode === "memory") return `<p class="banner">This view can't save, so prospects last until you close the page.</p>`;
   return "";
 }
 function listHTML(){
   if(S.mode === "loading") return `<p class="muted">Loading your prospects…</p>`;
   const all = list();
-  const head = `<section class="head-row"><div><p class="eyebrow">Prospects</p><h1>Your prospects</h1></div><button class="btn" data-act="nav" data-view="discover">Find more organizations</button></section>${modeBanner()}`;
+  const head = `<section class="head-row"><div><p class="eyebrow">Prospects</p><h1>Your prospects</h1></div>
+    <div class="row" style="flex:0 0 auto">${all.length ? (S.confirmClear ? `<span class="confirm">Remove all prospects? <button class="btn small danger" data-act="clear-all">Remove all</button><button class="btn small" data-act="cancel-clear">Keep</button></span>` : `<button class="btn ghost small danger" data-act="ask-clear">Clear all</button>`) : ""}<button class="btn" data-act="nav" data-view="discover">Find more organizations</button></div></section>${modeBanner()}`;
   if(!all.length) return head + `<div class="panel empty"><h2>No prospects yet</h2>
     <p>Save an organization from Discover when it looks worth investigating. To see how a qualified prospect looks, load three worked examples.</p>
     <div class="row" style="justify-content:center"><button class="btn primary" data-act="nav" data-view="discover">Go to Discover</button><button class="btn" data-act="examples">Load 3 examples</button></div></div>`;
@@ -675,25 +904,31 @@ function listHTML(){
   const f = S.keep.statusFilter;
   const counts = Object.fromEntries(STATUSES.map(s => [s, all.filter(p => p.status === s).length]));
   const chips = `<div class="chips">${[["all", `All (${all.length})`], ...STATUSES.map(s => [s, `${s} (${counts[s]})`])].map(([k, l]) => `<button class="chip" data-act="status-filter" data-k="${esc(k)}" aria-pressed="${f === k}">${esc(l)}</button>`).join("")}</div>`;
-  const rows = all.filter(p => f === "all" || p.status === f);
+  const sorters = {fit:fitSort, updated:(a, b) => (b.updatedAt || 0) - (a.updatedAt || 0), followup:(a, b) => (a.followUpDate || "9999").localeCompare(b.followUpDate || "9999")};
+  const rows = all.filter(p => f === "all" || p.status === f).sort(sorters[S.keep.sort] || fitSort);
+  const toolbar = `<div class="toolbar">${chips}<div class="row" style="flex:0 0 auto">
+    <label class="f" style="flex-direction:row;align-items:center;gap:6px">Sort<select id="sort">${[["fit","Best fit first"],["followup","Follow-up date"],["updated","Recently updated"]].map(([k, l]) => `<option value="${k}" ${S.keep.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <button class="btn small" data-act="export-prospects">Export prospects (CSV)</button><button class="btn small" data-act="export-outreach">Export outreach (CSV)</button></div></div>`;
   const table = `<div class="plist">
-    <div class="prow hdr"><span>Organization</span><span>Status</span><span>Main problem</span><span>Next step</span><span>Follow-up</span></div>
-    ${rows.length ? rows.map(p => `<button class="prow" data-act="open" data-id="${p.id}">
+    <div class="prow hdr"><span>Organization</span><span>Fit</span><span>Status</span><span>Main problem</span><span>Next step</span><span>Follow-up</span></div>
+    ${rows.length ? rows.map(p => { const fo = fitOf(p); return `<button class="prow" data-act="open" data-id="${p.id}">
       <span class="nm"><b>${esc(p.name)}${p.example ? `<span class="ex">Example</span>` : ""}</b><span>${esc(p.sector || "Sector not set")} · ${p.contacts.length} contact${p.contacts.length === 1 ? "" : "s"}${p.contacts.some(c => c.authority === "Decision-maker") ? " · decision-maker found" : ""}</span></span>
+      <span class="c-fit">${fitPill(fo)} <span class="note mono">${fo.yes.length}/${CRIT.length}</span></span>
       <span class="c-status"><span class="pill st-${cls(p.status)}">${esc(p.status)}</span></span>
       <span class="cell c-problem">${esc(p.analysis.problems[0] ? p.analysis.problems[0].title : "Not identified")}</span>
       <span class="cell c-next muted">${esc(p.nextAction || "—")}</span>
       <span class="cell c-fu">${p.followUpDate ? `<span class="when mono ${whenClass(p.followUpDate)}">${fmtDate(p.followUpDate)}</span>` : ""}</span>
-    </button>`).join("") : `<p class="note" style="padding:16px">No prospects with this status.</p>`}</div>`;
-  return head + fuHTML + chips + table;
+    </button>`; }).join("") : `<p class="note" style="padding:16px">No prospects with this status.</p>`}</div>`;
+  return head + fuHTML + toolbar + table + HOW_RATE;
 }
 
 /* Profile */
 function profileHTML(p){
   const contactsOpts = p.contacts.map(c => `<option value="${c.id}">${esc(c.name)} · ${esc(c.role)}</option>`).join("");
   const conName = id => { const c = p.contacts.find(x => x.id === id); return c ? `${c.name} (${c.role})` : "Contact not listed"; };
-  const aiOff = !S.sample || S.aiOff;
   const delConfirm = S.confirmDel === p.id;
+  const f = fitOf(p);
+  const showJobs = S.server.jobs || p.jobs;
   return `
   <button class="btn ghost back" data-act="back">← All prospects</button>
   ${modeBanner()}
@@ -701,23 +936,31 @@ function profileHTML(p){
     <div><p class="eyebrow">Prospect${p.example ? " · Example" : ""}</p><h1 style="margin-top:4px">${esc(p.name)}</h1>
       <p class="meta">${esc([p.sector, p.size, p.region].filter(Boolean).join(" · ") || "Add sector and size in Details")}${p.website ? ` · <span class="mono">${esc(p.website)}</span>` : ""}</p>
       ${p.signals.length ? `<div class="tags" style="margin-top:8px">${p.signals.map(s => `<span class="tag">${SIGNALS[s] || esc(s)}</span>`).join("")}</div>` : ""}</div>
-    <span class="pill st-${cls(p.status)}">${esc(p.status)}</span>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${fitPill(f)}<span class="pill st-${cls(p.status)}">${esc(p.status)}</span></div>
   </section>
   <div class="profile">
     <div class="col">
       <section class="panel">
         <div class="panel-head"><h2>Why is this a prospect?</h2>
-          <button class="btn small" data-act="rerun" ${aiOff || S.rerun.busy ? "disabled" : ""} title="${aiOff ? "AI isn't available in this view" : "Update the assessment using your evidence, contacts and outreach"}">${S.rerun.busy ? `<span class="dots">Updating</span>` : p.analysis.generatedBy === "none" ? "Assess with AI" : "Update with AI"}</button></div>
+          <button class="btn small" data-act="rerun" ${!aiOn() || S.rerun.busy ? "disabled" : ""} title="${!aiOn() ? "AI isn't connected in this version" : "Update the assessment using your evidence, contacts and outreach"}">${S.rerun.busy ? `<span class="dots">Updating</span>` : p.analysis.generatedBy === "none" ? "Assess with AI" : "Update with AI"}</button></div>
         ${S.rerun.busy ? `<p class="status-line">This can take up to a minute. <button class="btn ghost small" data-act="stop" data-what="rerun">Stop</button></p>` : ""}
         ${S.rerun.err ? `<p class="status-line err">${esc(S.rerun.err)}</p>` : ""}
         ${p.summary ? `<p>${esc(p.summary)}</p>` : ""}
         ${analysisHTML(p.analysis, p.analysis.generatedBy, p)}
       </section>
+      ${showJobs ? `<section class="panel">
+        <div class="panel-head"><h2>Hiring activity</h2>${S.server.jobs ? `<button class="btn small" data-act="jobs" ${S.jobs.busy ? "disabled" : ""}>${S.jobs.busy ? `<span class="dots">Checking</span>` : p.jobs ? "Check again" : "Check job postings"}</button>` : ""}</div>
+        ${S.jobs.err ? `<p class="status-line err">${esc(S.jobs.err)}</p>` : ""}
+        ${p.jobs ? `<div class="postings"><p><b class="mono">${p.jobs.count}</b> postings in the last ${p.jobs.searched.days} days, <b class="mono">${p.jobs.peopleRoles}</b> in HR, training or talent roles. <span class="note">Adzuna, checked ${fmtDate(p.jobs.checkedAt)}.</span></p>
+          ${p.jobs.sample.length ? `<ul>${p.jobs.sample.map(x => `<li>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` : esc(x.title)} <span class="note">· ${esc(x.location)}${x.created ? " · " + fmtDate(x.created) : ""}</span></li>`).join("")}</ul>` : ""}
+          <p class="note">Matched by employer name, so check that the postings are really theirs.</p></div>`
+          : `<p class="note">Pull recent job postings for ${esc(p.name)} as evidence of hiring or workforce change.</p>`}
+      </section>` : ""}
       <section class="panel">
         <div class="panel-head"><h2>Outreach and what you learned</h2><span class="note">${p.outreach.length} logged</span></div>
         ${p.outreach.length ? `<ul class="log">${p.outreach.slice().sort((a, b) => b.date.localeCompare(a.date)).map(o => `
           <li><span class="d">${fmtDate(o.date)}</span><div class="what">
-            <div><span class="oc oc-${cls(o.outcome)}">${esc(o.outcome)}</span> <span class="note">· ${esc(o.channel)} · ${esc(conName(o.contactId))}</span></div>
+            <div><span class="oc oc-${cls(o.outcome)}">${esc(o.outcome)}</span> <span class="note">· ${esc(o.channel)} · ${esc(conName(o.contactId))}${o.connection ? " · " + esc(o.connection) : ""}</span></div>
             ${o.reason ? `<span class="note">Reason: ${esc(o.reason)}</span>` : ""}
             ${o.learned ? `<p class="learned">${esc(o.learned)}</p>` : ""}
             <div><button class="btn ghost small danger" data-act="del-outreach" data-id="${o.id}">Remove entry</button></div>
@@ -741,6 +984,11 @@ function profileHTML(p){
     </div>
     <div class="col">
       <section class="panel">
+        <h2>Fit rating</h2>
+        ${fitHTML(p, true)}
+        ${HOW_RATE}
+      </section>
+      <section class="panel">
         <h2>Status and next step</h2>
         <label class="f">Status<select data-field="status" id="p-status">${STATUSES.map(s => `<option ${s === p.status ? "selected" : ""}>${s}</option>`).join("")}</select></label>
         <label class="f">${p.status === "Not a Fit" ? "Why isn't it a fit?" : "Why this status?"}<textarea data-field="fitNote" id="p-fitnote" rows="2" placeholder="${p.status === "Not a Fit" ? "This feeds your Learnings" : "Optional"}">${esc(p.fitNote)}</textarea></label>
@@ -751,7 +999,8 @@ function profileHTML(p){
         <div class="panel-head"><h2>Contacts</h2><span class="note">${p.contacts.some(c => c.authority === "Decision-maker") ? "Decision-maker identified" : "No decision-maker yet"}</span></div>
         ${p.contacts.map(c => `<div class="contact">
           <div class="top"><div><b>${esc(c.name)}</b><div class="info">${esc(c.role)}</div></div>
-            <select data-contact="${c.id}" aria-label="Purchasing authority for ${esc(c.name)}" class="auth-${cls(c.authority)}">${AUTH.map(a => `<option ${a === c.authority ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+            <select data-contact="${c.id}" data-cfield="authority" aria-label="Purchasing authority for ${esc(c.name)}" class="auth-${cls(c.authority)}">${AUTH.map(a => `<option ${a === c.authority ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+          <div class="row" style="align-items:center"><span class="note" style="flex:0 0 auto">Connection</span><select data-contact="${c.id}" data-cfield="connection" aria-label="Connection to ${esc(c.name)}" style="flex:0 0 auto;width:auto;padding:3px 6px;font-size:.82rem">${CONNECTIONS.map(a => `<option value="${a}" ${a === c.connection ? "selected" : ""}>${CONN_LABEL[a]}</option>`).join("")}</select></div>
           ${c.email || c.phone ? `<div class="info mono">${esc([c.email, c.phone].filter(Boolean).join(" · "))}</div>` : ""}
           ${c.notes ? `<div class="info">${esc(c.notes)}</div>` : ""}
           <div><button class="btn ghost small danger" data-act="del-contact" data-id="${c.id}">Remove</button></div>
@@ -762,7 +1011,8 @@ function profileHTML(p){
               <label class="f">Role<input type="text" name="role" id="c-role" required placeholder="e.g. Director of L&D"></label></div>
             <div class="row"><label class="f">Email<input type="text" name="email" id="c-email"></label>
               <label class="f">Phone<input type="text" name="phone" id="c-phone"></label></div>
-            <label class="f">Purchasing authority<select name="authority" id="c-auth">${AUTH.map(a => `<option ${a === "Unknown" ? "selected" : ""}>${a}</option>`).join("")}</select></label>
+            <div class="row"><label class="f">Purchasing authority<select name="authority" id="c-auth">${AUTH.map(a => `<option ${a === "Unknown" ? "selected" : ""}>${a}</option>`).join("")}</select></label>
+              <label class="f">Connection<select name="connection" id="c-conn">${CONNECTIONS.map(a => `<option value="${a}" ${a === "Warm" ? "selected" : ""}>${CONN_LABEL[a]}</option>`).join("")}</select></label></div>
             <label class="f">Notes<input type="text" name="notes" id="c-notes" placeholder="How you know them, what they care about"></label>
             <div><button class="btn primary">Add contact</button></div>
           </form>
@@ -795,7 +1045,7 @@ function learnHTML(){
     <p class="lede muted" style="margin-top:10px;max-width:60ch">Every response, including no response, is evidence about who Myrimaven's customer is. This page collects it.</p></section>`;
   if(!all.length) return head + `<div class="panel empty"><h2>Nothing to learn from yet</h2><p>Log outreach on a prospect and the reasons and lessons collect here.</p><button class="btn" data-act="examples">Load 3 examples</button></div>`;
   const stats = `<div class="stats">${STATUSES.map(s => `<div class="stat"><b>${all.filter(p => p.status === s).length}</b><span class="pill st-${cls(s)}">${s}</span></div>`).join("")}</div>`;
-  const entries = all.flatMap(p => p.outreach.map(o => ({...o, org:p.name, sector:p.sector})));
+  const entries = all.flatMap(p => p.outreach.map(o => ({...o, org:p.name, sector:p.sector, conn:o.connection || ((p.contacts.find(c => c.id === o.contactId) || {}).connection) || "Unknown"})));
   const reasons = {};
   entries.filter(e => e.reason).forEach(e => (reasons[e.reason] = reasons[e.reason] || []).push(e));
   all.filter(p => p.status === "Not a Fit" && p.fitNote).forEach(p => (reasons["Marked Not a Fit"] = reasons["Marked Not a Fit"] || []).push({org:p.name, sector:p.sector, learned:p.fitNote}));
@@ -803,6 +1053,11 @@ function learnHTML(){
     <div class="reason"><div class="rh"><span>${esc(r)}</span><span class="mono">${es.length}</span></div>
       <ul>${es.map(e => `<li><b>${esc(e.org)}</b>${e.sector ? ` (${esc(e.sector)})` : ""}${e.learned ? ": " + esc(e.learned) : ""}</li>`).join("")}</ul></div>`).join("")
     : `<p class="note">When a contact says no, pick a reason in the outreach log. Patterns show up here.</p>`;
+  const conn = {};
+  entries.forEach(e => { const c = conn[e.conn] = conn[e.conn] || {n:0, replied:0, positive:0}; c.n++; if(e.outcome !== "No response") c.replied++; if(["Interested","Meeting booked"].includes(e.outcome)) c.positive++; });
+  const cHTML = Object.keys(conn).length ? `<div class="tbl-wrap"><table><thead><tr><th>Connection</th><th class="n">Outreach</th><th class="n">Got a reply</th><th class="n">Interested</th></tr></thead><tbody>
+    ${CONNECTIONS.filter(k => conn[k]).map(k => `<tr><td>${esc(CONN_LABEL[k])}</td><td class="n">${conn[k].n}</td><td class="n">${conn[k].replied}</td><td class="n">${conn[k].positive}</td></tr>`).join("")}</tbody></table></div>`
+    : `<p class="note">Log outreach to compare warm, referral and cold contacts.</p>`;
   const sectors = {};
   all.forEach(p => { const k = p.sector || "Sector not set"; const s = sectors[k] = sectors[k] || {n:0, contacted:0, positive:0, nofit:0};
     s.n++; if(p.outreach.length) s.contacted++; if(p.outreach.some(o => ["Interested","Meeting booked"].includes(o.outcome))) s.positive++; if(p.status === "Not a Fit") s.nofit++; });
@@ -813,6 +1068,7 @@ function learnHTML(){
     : `<p class="note">Nothing written yet. Use "What did you learn?" when you log outreach.</p>`;
   return head + stats + `<div class="learn">
     <div class="col"><section class="panel"><h2>Why prospects weren't a fit</h2>${rHTML}</section>
+      <section class="panel"><h2>Warm vs. cold</h2>${cHTML}<p class="note">Tests whether warm contacts really reply more often than cold ones.</p></section>
       <section class="panel"><h2>Responses by sector</h2>${sHTML}<p class="note">Counts only. With this few conversations, read them as hints, not trends.</p></section></div>
     <section class="panel"><h2>Lessons, newest first</h2>${fHTML}</section></div>`;
 }
@@ -823,44 +1079,54 @@ document.addEventListener("click", e => {
   const act = el.dataset.act;
   const p = S.openId && S.prospects[S.openId];
   switch(act){
-    case "nav": S.view = el.dataset.view; S.openId = null; S.confirmDel = null; render(); window.scrollTo(0, 0); break;
+    case "nav": go(el.dataset.view); break;
     case "signal": S.keep.signal = el.dataset.k; $("#chips").innerHTML = chipsHTML(); $("#cards").innerHTML = cardsHTML(); break;
+    case "rating": S.keep.rating = el.dataset.k; $("#rchips").innerHTML = ratingChipsHTML(); $("#cards").innerHTML = cardsHTML(); break;
     case "status-filter": S.keep.statusFilter = el.dataset.k; render(); break;
+    case "ask-clear": S.confirmClear = true; render(); break;
+    case "cancel-clear": S.confirmClear = false; render(); break;
+    case "clear-all": Object.keys(S.prospects).forEach(removeProspect); S.confirmClear = false; render(); toast("All prospects removed."); break;
+    case "export-prospects": exportProspects(); break;
+    case "export-outreach": exportOutreach(); break;
     case "preview": { const c = CATALOG.find(x => x.key === el.dataset.key); S.preview = {org:c, analysis:c.analysis, by:"sample"}; renderSheet(); break; }
     case "close-sheet": S.preview = null; renderSheet(); break;
     case "save-preview": {
       const pv = S.preview; const np = newProspect(pv.org, pv.analysis, pv.by);
-      persist(np); S.preview = null; S.view = "prospects"; S.openId = np.id; render(); window.scrollTo(0, 0);
-      toast("Saved. Check the evidence, add a contact, then set a status."); break; }
-    case "open": S.preview = null; S.view = "prospects"; S.openId = el.dataset.id; S.confirmDel = null; S.rerun.err = ""; render(); window.scrollTo(0, 0); break;
-    case "back": S.openId = null; S.confirmDel = null; render(); break;
+      if(!pv.org.region && S.keep.ar) np.region = S.keep.ar;
+      persist(np); go("prospects", np.id);
+      toast("Saved. Check the evidence and fit, add a contact, then set a status."); break; }
+    case "open": go("prospects", el.dataset.id); break;
+    case "back": go("prospects"); break;
     case "examples": loadExamples(); break;
     case "suggest": runSuggest(S.keep.sq || "", S.keep.sr || ""); break;
     case "analyze": {
       const name = (S.keep.an || "").trim();
       if(!name){ $("#an").focus(); S.analyze.err = "Enter an organization name first."; paintAnalyzeStatus(); return; }
-      runAnalyze(name, S.keep.aw || "", S.keep.ax || ""); break; }
+      runAnalyze(name, S.keep.aw || "", S.keep.ax || "", null, S.keep.ar || ""); break; }
     case "analyze-sugg": {
       const x = S.suggest.items[+el.dataset.i]; if(!x) return;
-      S.keep.an = x.name; S.keep.aw = ""; S.keep.ax = `Suggested because: ${x.rationale}\nHow to check: ${x.verify}\nSector: ${x.sector}. Region: ${x.region}.`;
-      ["an","aw","ax"].forEach(k => { const i = document.getElementById(k); if(i) i.value = S.keep[k]; });
-      runAnalyze(x.name, "", S.keep.ax, x.signals); break; }
+      S.keep.an = x.name; S.keep.aw = ""; S.keep.ar = x.region || S.keep.sr || "";
+      S.keep.ax = `Suggested because: ${x.rationale}\nHow to check: ${x.verify}\nSector: ${x.sector}. Region: ${x.region}.`;
+      ["an","aw","ar","ax"].forEach(k => { const i = document.getElementById(k); if(i) i.value = S.keep[k]; });
+      runAnalyze(x.name, "", S.keep.ax, x.signals, S.keep.ar); break; }
     case "save-manual": {
       const name = (S.keep.an || "").trim();
       if(!name){ $("#an").focus(); S.analyze.err = "Enter an organization name first."; paintAnalyzeStatus(); return; }
-      const ex = isSaved({name}); if(ex){ S.view = "prospects"; S.openId = ex.id; render(); return; }
-      const np = newProspect({name, website:S.keep.aw || ""}, null, "none");
+      const ex = isSaved({name}); if(ex){ go("prospects", ex.id); return; }
+      const np = newProspect({name, website:S.keep.aw || "", region:S.keep.ar || ""}, null, "none");
       if(S.keep.ax) np.notes = S.keep.ax;
-      persist(np); S.keep.an = S.keep.aw = S.keep.ax = ""; S.view = "prospects"; S.openId = np.id; render(); window.scrollTo(0, 0); break; }
+      persist(np); S.keep.an = S.keep.aw = S.keep.ax = S.keep.ar = ""; go("prospects", np.id); break; }
     case "stop": { const w = S[el.dataset.what]; if(w && w.ctl) w.ctl.abort(); break; }
     case "rerun": if(p) rerunAnalysis(p); break;
+    case "jobs": if(p) checkJobs(p); break;
+    case "fit": if(p){ const k = el.dataset.k, v = el.dataset.v; if(p.fit[k] !== v){ const before = fitOf(p).rating; p.fit[k] = v; delete p.fitWhy[k]; persist(p); render(); const after = fitOf(p).rating; if(after !== before) toast(`Fit rating changed: ${before} → ${after}.`); } } break;
     case "ev-check": if(p){ const ev = p.analysis.evidence[+el.dataset.i]; ev.checked = el.checked; persist(p); el.closest("li").classList.toggle("checked", el.checked); } break;
     case "un-check": if(p){ const u = p.analysis.unknowns[+el.dataset.i]; u.done = el.checked; persist(p); el.closest("li").classList.toggle("done", el.checked); } break;
     case "del-contact": if(p){ p.contacts = p.contacts.filter(c => c.id !== el.dataset.id); persist(p); render(); } break;
     case "del-outreach": if(p){ p.outreach = p.outreach.filter(o => o.id !== el.dataset.id); persist(p); render(); } break;
     case "ask-del": S.confirmDel = S.openId; render(); break;
     case "cancel-del": S.confirmDel = null; render(); break;
-    case "del-prospect": if(p){ removeProspect(p.id); S.openId = null; S.confirmDel = null; render(); toast("Prospect removed."); } break;
+    case "del-prospect": if(p){ removeProspect(p.id); go("prospects"); toast("Prospect removed."); } break;
   }
 });
 document.addEventListener("input", e => {
@@ -871,9 +1137,14 @@ document.addEventListener("input", e => {
 document.addEventListener("change", e => {
   const t = e.target;
   if(t.id === "showOutside"){ S.keep.showOutside = t.checked; $("#cards").innerHTML = cardsHTML(); return; }
+  if(t.id === "sort"){ S.keep.sort = t.value; render(); return; }
   const p = S.openId && S.prospects[S.openId]; if(!p) return;
-  if(t.dataset.field){ p[t.dataset.field] = t.value; persist(p); if(["status"].includes(t.dataset.field)) render(); return; }
-  if(t.dataset.contact){ const c = p.contacts.find(x => x.id === t.dataset.contact); if(c){ c.authority = t.value; persist(p); render(); } }
+  if(t.dataset.field){ p[t.dataset.field] = t.value; persist(p); if(t.dataset.field === "status") render(); return; }
+  if(t.dataset.contact){
+    const c = p.contacts.find(x => x.id === t.dataset.contact); if(!c) return;
+    const before = fitOf(p).rating; c[t.dataset.cfield] = t.value; persist(p); render();
+    const after = fitOf(p).rating; if(after !== before) toast(`Fit rating changed: ${before} → ${after}.`);
+  }
 });
 document.addEventListener("submit", e => {
   const f = e.target.closest("form[data-form]"); if(!f) return;
@@ -881,42 +1152,57 @@ document.addEventListener("submit", e => {
   const p = S.prospects[S.openId]; if(!p) return;
   const d = Object.fromEntries(new FormData(f).entries());
   const kind = f.dataset.form;
-  if(kind === "evidence"){ p.analysis.evidence.push({text:d.t.trim(), source:(d.s || "").trim() || "Added by Joan", checked:true}); if(d.s && d.s.trim()) p.analysis.evidence[p.analysis.evidence.length - 1].mine = true; }
+  const before = fitOf(p).rating;
+  const notes = [];
+  if(kind === "evidence") p.analysis.evidence.push({text:d.t.trim(), source:(d.s || "").trim() || "Added by Joan", checked:true, mine:true});
   if(kind === "unknown") p.analysis.unknowns.push({text:d.t.trim(), done:false, mine:true});
-  if(kind === "contact") p.contacts.push({id:uid(), name:d.name.trim(), role:d.role.trim(), email:d.email.trim(), phone:d.phone.trim(), authority:d.authority, notes:d.notes.trim()});
+  if(kind === "contact") p.contacts.push({id:uid(), name:d.name.trim(), role:d.role.trim(), email:d.email.trim(), phone:d.phone.trim(), authority:d.authority, connection:d.connection, notes:d.notes.trim()});
   if(kind === "outreach"){
-    p.outreach.push({id:uid(), date:d.date, contactId:d.contactId, channel:d.channel, outcome:d.outcome, reason:d.reason, learned:d.learned.trim()});
-    if(p.outreach.length === 1 && ["Needs Validation","Potential Fit"].includes(p.status)){ p.status = "Contacted"; toast("Logged. Status set to Contacted."); }
-    else toast("Logged.");
+    const c = p.contacts.find(x => x.id === d.contactId);
+    p.outreach.push({id:uid(), date:d.date, contactId:d.contactId, connection:c ? c.connection : "Unknown", channel:d.channel, outcome:d.outcome, reason:d.reason, learned:d.learned.trim()});
+    if(p.outreach.length === 1 && ["Needs Validation","Potential Fit"].includes(p.status)){ p.status = "Contacted"; notes.push("Status set to Contacted"); }
+    const k = REASON_FIT[d.reason];
+    if(k && p.fit[k] !== "no"){ p.fit[k] = "no"; p.fitWhy[k] = `From outreach on ${fmtDate(d.date)}: ${d.reason.toLowerCase()}.`; notes.push(`"${CRIT.find(c => c.k === k).label}" set to No`); }
   }
   persist(p); render();
+  const after = fitOf(p).rating;
+  if(after !== before) notes.push(`fit rating ${before} → ${after}`);
+  if(kind === "outreach" || notes.length) toast(["Logged"].concat(notes).join(". ") + ".");
 });
 document.addEventListener("keydown", e => { if(e.key === "Escape" && S.preview){ S.preview = null; renderSheet(); } });
 
 /* ---------- boot ---------- */
-const use = n => (window.claude && window.claude.use) ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
-render();
+const use = n => IN_CLAUDE ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
+if(IN_CLAUDE) render(); else applyRoute();
 (async () => {
-  const [db, user, sample] = await Promise.all([use("db"), use("user"), use("sample")]);
-  S.sample = sample;
-  const id = user ? await user.id().catch(() => null) : null;
-  if(db && id){
-    try{
-      S.coll = db.collection("data/users/" + id);
-      S.mode = "db";
-      let first = true;
-      S.unsub = S.coll.onSnapshot(snap => {
-        let changed = first; first = false;
-        for(const ch of snap.docChanges()){
-          const docId = ch.doc.id;
-          if(ch.type === "removed"){ if(S.prospects[docId]){ delete S.prospects[docId]; changed = true; } continue; }
-          const d = ch.doc.data(); const loc = S.prospects[docId];
-          if(d && (!loc || (d.updatedAt || 0) > (loc.updatedAt || 0))){ S.prospects[docId] = clone(d); changed = true; }
-        }
-        if(changed){ const a = document.activeElement; const typing = a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest("#main") && !first; if(!typing || S.view !== "prospects") render(); }
-      }, () => { S.mode = "memory"; render(); });
-    }catch(_){ S.mode = "memory"; }
-  } else S.mode = "memory";
+  if(IN_CLAUDE){
+    const [db, user, sample, downloads] = await Promise.all([use("db"), use("user"), use("sample"), use("downloads")]);
+    S.sample = sample; S.downloads = downloads;
+    const id = user ? await user.id().catch(() => null) : null;
+    if(db && id){
+      try{
+        S.coll = db.collection("data/users/" + id);
+        S.mode = "db";
+        let first = true;
+        S.unsub = S.coll.onSnapshot(snap => {
+          let changed = first; const wasFirst = first; first = false;
+          for(const ch of snap.docChanges()){
+            const docId = ch.doc.id;
+            if(ch.type === "removed"){ if(S.prospects[docId]){ delete S.prospects[docId]; changed = true; } continue; }
+            const d = ch.doc.data(); const loc = S.prospects[docId];
+            if(d && (!loc || (d.updatedAt || 0) > (loc.updatedAt || 0))){ S.prospects[docId] = upgrade(clone(d)); changed = true; }
+          }
+          if(changed){ const a = document.activeElement; const typing = !wasFirst && a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest("#main"); if(!typing || S.view !== "prospects") render(); }
+        }, () => { S.mode = "memory"; render(); });
+      }catch(_){ S.mode = "memory"; }
+    } else S.mode = "memory";
+  } else {
+    try{ const r = await fetch("/api/status"); if(r.ok){ const j = await r.json(); S.server = {ai:!!j.ai, jobs:!!j.jobs}; } }catch(_){}
+    const saved = lsLoad();
+    let ok = saved !== null;
+    if(ok){ try{ localStorage.setItem(LS_KEY + "-test", "1"); localStorage.removeItem(LS_KEY + "-test"); }catch(_){ ok = false; } }
+    if(ok){ S.mode = "local"; Object.values(saved).forEach(p => { S.prospects[p.id] = upgrade(p); }); } else S.mode = "memory";
+  }
   render();
 })();
 </script>

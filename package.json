@@ -1,0 +1,5 @@
+{
+  "name": "myrimaven-prospect-desk",
+  "private": true,
+  "engines": { "node": ">=18" }
+}
